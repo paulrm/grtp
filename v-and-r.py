@@ -487,6 +487,294 @@ class FileManager:
         return results
 
 
+class GitManager:
+    """Handles git integration for release management"""
+    
+    def __init__(self):
+        """Initialize GitManager"""
+        self.version_manager = VersionManager()
+    
+    def is_git_repository(self) -> bool:
+        """
+        Check if current directory is a git repository.
+        
+        Returns:
+            True if current directory is a git repository, False otherwise
+        """
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--git-dir'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            return False
+    
+    def get_git_tags(self) -> List[str]:
+        """
+        Get all git tags sorted by version.
+        
+        Returns:
+            List of git tags sorted by semantic version (highest first)
+            
+        Raises:
+            GitError: If git command fails or not in a git repository
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        try:
+            result = subprocess.run(
+                ['git', 'tag', '-l'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                raise GitError(f"Git tag command failed: {result.stderr}")
+            
+            tags = [tag.strip() for tag in result.stdout.split('\n') if tag.strip()]
+            
+            if not tags:
+                return []
+            
+            # Filter and sort tags by version
+            version_tags = []
+            for tag in tags:
+                try:
+                    # Try to parse as version to validate it's a version tag
+                    self.version_manager.parse_version(tag)
+                    version_tags.append(tag)
+                except VersionError:
+                    # Skip non-version tags
+                    continue
+            
+            if not version_tags:
+                return []
+            
+            # Sort by version (highest first)
+            try:
+                version_tags.sort(key=lambda x: self.version_manager.parse_version(x), reverse=True)
+            except VersionError:
+                # Fallback to string sort if version parsing fails
+                version_tags.sort(reverse=True)
+            
+            return version_tags
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git tag command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
+    
+    def get_commits_between_tags(self, tag1: str, tag2: str) -> List[Dict]:
+        """
+        Get commits between two git tags.
+        
+        Args:
+            tag1: Starting tag (older)
+            tag2: Ending tag (newer)
+            
+        Returns:
+            List of commit dictionaries with hash, message, author, and date
+            
+        Raises:
+            GitError: If git command fails or tags don't exist
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        try:
+            # Verify tags exist
+            for tag in [tag1, tag2]:
+                result = subprocess.run(
+                    ['git', 'rev-parse', '--verify', f'{tag}^{{commit}}'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode != 0:
+                    raise GitError(f"Tag '{tag}' does not exist")
+            
+            # Get commits between tags
+            result = subprocess.run([
+                'git', 'log', 
+                f'{tag1}..{tag2}',
+                '--pretty=format:%H|%s|%an|%ad',
+                '--date=iso'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                raise GitError(f"Git log command failed: {result.stderr}")
+            
+            commits = []
+            for line in result.stdout.split('\n'):
+                if line.strip():
+                    parts = line.split('|', 3)
+                    if len(parts) == 4:
+                        commits.append({
+                            'hash': parts[0],
+                            'message': parts[1],
+                            'author': parts[2],
+                            'date': parts[3]
+                        })
+            
+            return commits
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git log command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
+    
+    def get_commits_since_tag(self, tag: str) -> List[Dict]:
+        """
+        Get commits since a specific tag.
+        
+        Args:
+            tag: Git tag to start from
+            
+        Returns:
+            List of commit dictionaries with hash, message, author, and date
+            
+        Raises:
+            GitError: If git command fails or tag doesn't exist
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        try:
+            # Verify tag exists
+            result = subprocess.run(
+                ['git', 'rev-parse', '--verify', f'{tag}^{{commit}}'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode != 0:
+                raise GitError(f"Tag '{tag}' does not exist")
+            
+            # Get commits since tag
+            result = subprocess.run([
+                'git', 'log', 
+                f'{tag}..HEAD',
+                '--pretty=format:%H|%s|%an|%ad',
+                '--date=iso'
+            ], capture_output=True, text=True, timeout=30)
+            
+            if result.returncode != 0:
+                raise GitError(f"Git log command failed: {result.stderr}")
+            
+            commits = []
+            for line in result.stdout.split('\n'):
+                if line.strip():
+                    parts = line.split('|', 3)
+                    if len(parts) == 4:
+                        commits.append({
+                            'hash': parts[0],
+                            'message': parts[1],
+                            'author': parts[2],
+                            'date': parts[3]
+                        })
+            
+            return commits
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git log command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
+    
+    def get_latest_tag(self) -> str:
+        """
+        Get the most recent git tag.
+        
+        Returns:
+            The most recent version tag
+            
+        Raises:
+            GitError: If no tags exist or git command fails
+        """
+        tags = self.get_git_tags()
+        if not tags:
+            raise GitError("No git tags found")
+        
+        return tags[0]  # First tag is the highest/most recent
+    
+    def get_current_commit_hash(self) -> str:
+        """
+        Get the current commit hash.
+        
+        Returns:
+            Current commit hash (short format)
+            
+        Raises:
+            GitError: If git command fails
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--short', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                raise GitError(f"Git rev-parse command failed: {result.stderr}")
+            
+            return result.stdout.strip()
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git rev-parse command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
+    
+    def get_all_commits_since_beginning(self) -> List[Dict]:
+        """
+        Get all commits from the beginning of the repository.
+        
+        Returns:
+            List of all commit dictionaries with hash, message, author, and date
+            
+        Raises:
+            GitError: If git command fails
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        try:
+            result = subprocess.run([
+                'git', 'log', 
+                '--pretty=format:%H|%s|%an|%ad',
+                '--date=iso'
+            ], capture_output=True, text=True, timeout=60)
+            
+            if result.returncode != 0:
+                raise GitError(f"Git log command failed: {result.stderr}")
+            
+            commits = []
+            for line in result.stdout.split('\n'):
+                if line.strip():
+                    parts = line.split('|', 3)
+                    if len(parts) == 4:
+                        commits.append({
+                            'hash': parts[0],
+                            'message': parts[1],
+                            'author': parts[2],
+                            'date': parts[3]
+                        })
+            
+            return commits
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git log command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
+
+
 # VERSION_FILES Configuration
 VERSION_FILES = [
     {
@@ -1041,6 +1329,351 @@ def test_file_manager():
         return False
 
 
+def test_git_manager():
+    """Comprehensive unit tests for GitManager class with mocked git operations"""
+    import unittest.mock as mock
+    
+    test_results = []
+    
+    def run_test(test_name: str, test_func):
+        """Helper to run individual tests and track results"""
+        try:
+            test_func()
+            test_results.append(f"✓ {test_name}")
+            return True
+        except Exception as e:
+            test_results.append(f"✗ {test_name}: {e}")
+            return False
+    
+    # Test is_git_repository method
+    def test_is_git_repository():
+        gm = GitManager()
+        
+        # Mock successful git command
+        with mock.patch('subprocess.run') as mock_run:
+            mock_run.return_value.returncode = 0
+            assert gm.is_git_repository() == True
+            mock_run.assert_called_with(
+                ['git', 'rev-parse', '--git-dir'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+        
+        # Mock failed git command (not a git repo)
+        with mock.patch('subprocess.run') as mock_run:
+            mock_run.return_value.returncode = 1
+            assert gm.is_git_repository() == False
+        
+        # Mock git command not found
+        with mock.patch('subprocess.run', side_effect=FileNotFoundError):
+            assert gm.is_git_repository() == False
+        
+        # Mock timeout
+        with mock.patch('subprocess.run', side_effect=subprocess.TimeoutExpired('git', 10)):
+            assert gm.is_git_repository() == False
+    
+    # Test get_git_tags method
+    def test_get_git_tags():
+        gm = GitManager()
+        
+        # Mock not in git repository
+        with mock.patch.object(gm, 'is_git_repository', return_value=False):
+            try:
+                gm.get_git_tags()
+                assert False, "Should raise GitError for non-git repository"
+            except GitError as e:
+                assert "Not in a git repository" in str(e)
+        
+        # Mock successful git tags command with version tags
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 0
+                mock_run.return_value.stdout = "v1.0.0\nv1.2.0\nv1.1.0\nv2.0.0\nnon-version-tag\n"
+                
+                tags = gm.get_git_tags()
+                
+                # Should return version tags sorted by version (highest first)
+                expected_tags = ["v2.0.0", "v1.2.0", "v1.1.0", "v1.0.0"]
+                assert tags == expected_tags
+        
+        # Mock empty tags
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 0
+                mock_run.return_value.stdout = ""
+                
+                tags = gm.get_git_tags()
+                assert tags == []
+        
+        # Mock git command failure
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 1
+                mock_run.return_value.stderr = "fatal: not a git repository"
+                
+                try:
+                    gm.get_git_tags()
+                    assert False, "Should raise GitError for failed git command"
+                except GitError as e:
+                    assert "Git tag command failed" in str(e)
+        
+        # Mock timeout
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run', side_effect=subprocess.TimeoutExpired('git', 30)):
+                try:
+                    gm.get_git_tags()
+                    assert False, "Should raise GitError for timeout"
+                except GitError as e:
+                    assert "timed out" in str(e)
+    
+    # Test get_commits_between_tags method
+    def test_get_commits_between_tags():
+        gm = GitManager()
+        
+        # Mock not in git repository
+        with mock.patch.object(gm, 'is_git_repository', return_value=False):
+            try:
+                gm.get_commits_between_tags("v1.0.0", "v1.1.0")
+                assert False, "Should raise GitError for non-git repository"
+            except GitError as e:
+                assert "Not in a git repository" in str(e)
+        
+        # Mock successful commits between tags
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                # Mock tag verification (both calls succeed)
+                mock_run.side_effect = [
+                    mock.Mock(returncode=0),  # First tag verification
+                    mock.Mock(returncode=0),  # Second tag verification
+                    mock.Mock(  # Git log command
+                        returncode=0,
+                        stdout="abc123|Fix bug in parser|John Doe|2023-01-15 10:30:00 +0000\ndef456|Add new feature|Jane Smith|2023-01-16 14:20:00 +0000"
+                    )
+                ]
+                
+                commits = gm.get_commits_between_tags("v1.0.0", "v1.1.0")
+                
+                expected_commits = [
+                    {
+                        'hash': 'abc123',
+                        'message': 'Fix bug in parser',
+                        'author': 'John Doe',
+                        'date': '2023-01-15 10:30:00 +0000'
+                    },
+                    {
+                        'hash': 'def456',
+                        'message': 'Add new feature',
+                        'author': 'Jane Smith',
+                        'date': '2023-01-16 14:20:00 +0000'
+                    }
+                ]
+                assert commits == expected_commits
+        
+        # Mock invalid tag
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 1  # Tag verification fails
+                
+                try:
+                    gm.get_commits_between_tags("invalid-tag", "v1.1.0")
+                    assert False, "Should raise GitError for invalid tag"
+                except GitError as e:
+                    assert "does not exist" in str(e)
+        
+        # Mock git log command failure
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.side_effect = [
+                    mock.Mock(returncode=0),  # First tag verification
+                    mock.Mock(returncode=0),  # Second tag verification
+                    mock.Mock(returncode=1, stderr="fatal: bad revision")  # Git log fails
+                ]
+                
+                try:
+                    gm.get_commits_between_tags("v1.0.0", "v1.1.0")
+                    assert False, "Should raise GitError for failed git log"
+                except GitError as e:
+                    assert "Git log command failed" in str(e)
+    
+    # Test get_commits_since_tag method
+    def test_get_commits_since_tag():
+        gm = GitManager()
+        
+        # Mock not in git repository
+        with mock.patch.object(gm, 'is_git_repository', return_value=False):
+            try:
+                gm.get_commits_since_tag("v1.0.0")
+                assert False, "Should raise GitError for non-git repository"
+            except GitError as e:
+                assert "Not in a git repository" in str(e)
+        
+        # Mock successful commits since tag
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.side_effect = [
+                    mock.Mock(returncode=0),  # Tag verification
+                    mock.Mock(  # Git log command
+                        returncode=0,
+                        stdout="xyz789|Latest commit|Alice Brown|2023-01-17 09:15:00 +0000"
+                    )
+                ]
+                
+                commits = gm.get_commits_since_tag("v1.0.0")
+                
+                expected_commits = [
+                    {
+                        'hash': 'xyz789',
+                        'message': 'Latest commit',
+                        'author': 'Alice Brown',
+                        'date': '2023-01-17 09:15:00 +0000'
+                    }
+                ]
+                assert commits == expected_commits
+        
+        # Mock invalid tag
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 1  # Tag verification fails
+                
+                try:
+                    gm.get_commits_since_tag("invalid-tag")
+                    assert False, "Should raise GitError for invalid tag"
+                except GitError as e:
+                    assert "does not exist" in str(e)
+    
+    # Test get_latest_tag method
+    def test_get_latest_tag():
+        gm = GitManager()
+        
+        # Mock successful case with tags
+        with mock.patch.object(gm, 'get_git_tags', return_value=["v2.0.0", "v1.2.0", "v1.1.0"]):
+            latest = gm.get_latest_tag()
+            assert latest == "v2.0.0"
+        
+        # Mock no tags case
+        with mock.patch.object(gm, 'get_git_tags', return_value=[]):
+            try:
+                gm.get_latest_tag()
+                assert False, "Should raise GitError when no tags exist"
+            except GitError as e:
+                assert "No git tags found" in str(e)
+    
+    # Test get_current_commit_hash method
+    def test_get_current_commit_hash():
+        gm = GitManager()
+        
+        # Mock not in git repository
+        with mock.patch.object(gm, 'is_git_repository', return_value=False):
+            try:
+                gm.get_current_commit_hash()
+                assert False, "Should raise GitError for non-git repository"
+            except GitError as e:
+                assert "Not in a git repository" in str(e)
+        
+        # Mock successful commit hash retrieval
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 0
+                mock_run.return_value.stdout = "abc1234\n"
+                
+                commit_hash = gm.get_current_commit_hash()
+                assert commit_hash == "abc1234"
+        
+        # Mock git command failure
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 1
+                mock_run.return_value.stderr = "fatal: bad revision 'HEAD'"
+                
+                try:
+                    gm.get_current_commit_hash()
+                    assert False, "Should raise GitError for failed git command"
+                except GitError as e:
+                    assert "Git rev-parse command failed" in str(e)
+    
+    # Test get_all_commits_since_beginning method
+    def test_get_all_commits_since_beginning():
+        gm = GitManager()
+        
+        # Mock not in git repository
+        with mock.patch.object(gm, 'is_git_repository', return_value=False):
+            try:
+                gm.get_all_commits_since_beginning()
+                assert False, "Should raise GitError for non-git repository"
+            except GitError as e:
+                assert "Not in a git repository" in str(e)
+        
+        # Mock successful all commits retrieval
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 0
+                mock_run.return_value.stdout = "abc123|Initial commit|John Doe|2023-01-01 10:00:00 +0000\ndef456|Second commit|Jane Smith|2023-01-02 11:00:00 +0000"
+                
+                commits = gm.get_all_commits_since_beginning()
+                
+                expected_commits = [
+                    {
+                        'hash': 'abc123',
+                        'message': 'Initial commit',
+                        'author': 'John Doe',
+                        'date': '2023-01-01 10:00:00 +0000'
+                    },
+                    {
+                        'hash': 'def456',
+                        'message': 'Second commit',
+                        'author': 'Jane Smith',
+                        'date': '2023-01-02 11:00:00 +0000'
+                    }
+                ]
+                assert commits == expected_commits
+        
+        # Mock git command failure
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 1
+                mock_run.return_value.stderr = "fatal: your current branch does not have any commits yet"
+                
+                try:
+                    gm.get_all_commits_since_beginning()
+                    assert False, "Should raise GitError for failed git command"
+                except GitError as e:
+                    assert "Git log command failed" in str(e)
+    
+    # Run all tests
+    print("\nRunning GitManager unit tests...")
+    print("=" * 50)
+    
+    tests = [
+        ("is_git_repository", test_is_git_repository),
+        ("get_git_tags", test_get_git_tags),
+        ("get_commits_between_tags", test_get_commits_between_tags),
+        ("get_commits_since_tag", test_get_commits_since_tag),
+        ("get_latest_tag", test_get_latest_tag),
+        ("get_current_commit_hash", test_get_current_commit_hash),
+        ("get_all_commits_since_beginning", test_get_all_commits_since_beginning),
+    ]
+    
+    passed = 0
+    for test_name, test_func in tests:
+        if run_test(test_name, test_func):
+            passed += 1
+    
+    # Print results
+    for result in test_results:
+        print(result)
+    
+    print("=" * 50)
+    print(f"Tests passed: {passed}/{len(tests)}")
+    
+    if passed == len(tests):
+        print("All GitManager tests passed! ✓")
+        return True
+    else:
+        print("Some tests failed! ✗")
+        return False
+
+
 if __name__ == "__main__":
     # Check if running tests
     if len(sys.argv) > 1 and sys.argv[1] == "--test":
@@ -1049,8 +1682,9 @@ if __name__ == "__main__":
         
         version_success = test_version_manager()
         file_success = test_file_manager()
+        git_success = test_git_manager()
         
-        overall_success = version_success and file_success
+        overall_success = version_success and file_success and git_success
         
         print("\n" + "=" * 60)
         if overall_success:
