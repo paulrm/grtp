@@ -1342,6 +1342,104 @@ Configuration:
                 # Date parsing failed, skip date range
                 pass
     
+    def _format_commit_history(self, commits: List[Dict], show_stats: bool = False) -> None:
+        """
+        Format and display commit history in a readable format.
+        
+        Args:
+            commits: List of commit dictionaries with hash, message, author, and date
+            show_stats: Whether to show additional statistics
+        """
+        if not commits:
+            print("No commits to display.")
+            return
+        
+        # Display commits in chronological order (newest first)
+        for i, commit in enumerate(commits):
+            hash_short = commit['hash'][:7] if len(commit['hash']) >= 7 else commit['hash']
+            message = commit['message'].strip()
+            author = commit.get('author', 'Unknown')
+            date = commit.get('date', 'Unknown date')
+            
+            # Format date to be more readable
+            try:
+                # Parse ISO date and format it nicely
+                if date != 'Unknown date':
+                    # Extract just the date part (YYYY-MM-DD)
+                    date_part = date[:10] if len(date) >= 10 else date
+                else:
+                    date_part = date
+            except (ValueError, IndexError):
+                date_part = date
+            
+            # Display commit with formatting
+            print(f"{hash_short}  {message}")
+            print(f"         Author: {author}")
+            print(f"         Date: {date_part}")
+            
+            # Add spacing between commits, but not after the last one
+            if i < len(commits) - 1:
+                print()
+        
+        # Show statistics if requested
+        if show_stats:
+            print()
+            print("-" * 50)
+            print(f"Total commits: {len(commits)}")
+            
+            # Show unique authors
+            authors = set(commit.get('author', 'Unknown') for commit in commits)
+            print(f"Contributors: {len(authors)}")
+            if len(authors) <= 5:
+                print(f"  {', '.join(sorted(authors))}")
+            else:
+                author_list = sorted(authors)
+                print(f"  {', '.join(author_list[:5])} and {len(authors) - 5} more")
+            
+            # Show date range
+            try:
+                dates = [commit['date'] for commit in commits if commit.get('date') and commit['date'] != 'Unknown date']
+                if dates:
+                    # Sort dates to get range (newest first in git log output)
+                    sorted_dates = sorted(dates, reverse=True)
+                    if len(sorted_dates) > 1:
+                        newest_date = sorted_dates[0][:10]
+                        oldest_date = sorted_dates[-1][:10]
+                        print(f"Date range: {oldest_date} to {newest_date}")
+                    else:
+                        print(f"Date: {sorted_dates[0][:10]}")
+            except (KeyError, IndexError, TypeError):
+                # Date parsing failed, skip date range
+                pass
+            
+            # Categorize commits by type for summary
+            commit_types = {
+                'Features': 0,
+                'Bug Fixes': 0,
+                'Documentation': 0,
+                'Other': 0
+            }
+            
+            for commit in commits:
+                message = commit['message'].strip().lower()
+                if message.startswith(('feat:', 'feature:')):
+                    commit_types['Features'] += 1
+                elif message.startswith(('fix:', 'bugfix:')):
+                    commit_types['Bug Fixes'] += 1
+                elif message.startswith(('docs:', 'doc:')):
+                    commit_types['Documentation'] += 1
+                else:
+                    commit_types['Other'] += 1
+            
+            # Show commit type breakdown
+            type_summary = []
+            for commit_type, count in commit_types.items():
+                if count > 0:
+                    type_summary.append(f"{count} {commit_type.lower()}")
+            
+            if type_summary:
+                print(f"Breakdown: {', '.join(type_summary)}")
+    
     def _execute_release_info_command(self) -> int:
         """
         Execute release info command to generate version.json.
@@ -1401,9 +1499,71 @@ Configuration:
         print(f"v-and-r: Commits between {tag1} and {tag2}")
         print("=" * 50)
         
-        # This is a placeholder - full implementation will be in task 9
-        print("Release diff - implementation pending")
-        return 0
+        try:
+            # Check if we're in a git repository
+            if not self.git_manager.is_git_repository():
+                print("Error: Not in a git repository")
+                print("This command requires git integration to function.")
+                return 1
+            
+            # Validate that both tags exist
+            try:
+                # Get all available tags for reference
+                available_tags = self.git_manager.get_git_tags()
+                
+                # Check if tags exist
+                if tag1 not in available_tags:
+                    print(f"Error: Tag '{tag1}' does not exist")
+                    if available_tags:
+                        print(f"Available tags: {', '.join(available_tags[:10])}")
+                        if len(available_tags) > 10:
+                            print(f"... and {len(available_tags) - 10} more")
+                    else:
+                        print("No git tags found in this repository")
+                    return 1
+                
+                if tag2 not in available_tags:
+                    print(f"Error: Tag '{tag2}' does not exist")
+                    if available_tags:
+                        print(f"Available tags: {', '.join(available_tags[:10])}")
+                        if len(available_tags) > 10:
+                            print(f"... and {len(available_tags) - 10} more")
+                    else:
+                        print("No git tags found in this repository")
+                    return 1
+                
+            except GitError as e:
+                print(f"Error retrieving git tags: {e}")
+                return 1
+            
+            # Get commits between the tags
+            try:
+                commits = self.git_manager.get_commits_between_tags(tag1, tag2)
+                
+                if not commits:
+                    print(f"No commits found between {tag1} and {tag2}")
+                    print("This could mean:")
+                    print(f"  - The tags are the same commit")
+                    print(f"  - {tag2} is older than {tag1}")
+                    print(f"  - The tags are not in the current branch history")
+                    return 0
+                
+                # Display commit information
+                print(f"Found {len(commits)} commits between {tag1} and {tag2}:")
+                print()
+                
+                # Format and display commits
+                self._format_commit_history(commits, show_stats=True)
+                
+                return 0
+                
+            except GitError as e:
+                print(f"Error retrieving commits between tags: {e}")
+                return 1
+                
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            return 1
     
     def _execute_release_last_command(self) -> int:
         """
@@ -1415,9 +1575,67 @@ Configuration:
         print("v-and-r: Commits since last release")
         print("=" * 50)
         
-        # This is a placeholder - full implementation will be in task 9
-        print("Release last - implementation pending")
-        return 0
+        try:
+            # Check if we're in a git repository
+            if not self.git_manager.is_git_repository():
+                print("Error: Not in a git repository")
+                print("This command requires git integration to function.")
+                return 1
+            
+            # Get the latest tag
+            try:
+                latest_tag = self.git_manager.get_latest_tag()
+                print(f"Latest tag: {latest_tag}")
+                print()
+                
+            except GitError as e:
+                # No tags exist, show all commits from beginning
+                print("No git tags found - showing all commits from repository beginning")
+                print()
+                
+                try:
+                    commits = self.git_manager.get_all_commits_since_beginning()
+                    
+                    if not commits:
+                        print("No commits found in this repository")
+                        return 0
+                    
+                    print(f"Found {len(commits)} total commits:")
+                    print()
+                    
+                    # Format and display commits
+                    self._format_commit_history(commits, show_stats=True)
+                    
+                    return 0
+                    
+                except GitError as git_error:
+                    print(f"Error retrieving commit history: {git_error}")
+                    return 1
+            
+            # Get commits since the latest tag
+            try:
+                commits = self.git_manager.get_commits_since_tag(latest_tag)
+                
+                if not commits:
+                    print(f"No commits found since {latest_tag}")
+                    print("The repository is up to date with the latest tag.")
+                    return 0
+                
+                print(f"Found {len(commits)} commits since {latest_tag}:")
+                print()
+                
+                # Format and display commits
+                self._format_commit_history(commits, show_stats=True)
+                
+                return 0
+                
+            except GitError as e:
+                print(f"Error retrieving commits since tag: {e}")
+                return 1
+                
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            return 1
     
     def _execute_release_prepare_command(self) -> int:
         """
@@ -1803,6 +2021,169 @@ def test_cli_interface():
                                 assert 'v1.2.3' in output
                                 assert 'v2.0.0' in output
     
+    def test_execute_release_diff_command():
+        cli = CLIInterface()
+        
+        # Test successful release diff
+        mock_commits = [
+            {'hash': 'abc1234567', 'message': 'feat: add new feature', 'author': 'Test User', 'date': '2023-01-01T10:00:00'},
+            {'hash': 'def5678901', 'message': 'fix: resolve bug', 'author': 'Test User', 'date': '2023-01-02T10:00:00'}
+        ]
+        
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_git_tags', return_value=['v1.1.0', 'v1.0.0']):
+                with mock.patch.object(cli.git_manager, 'get_commits_between_tags', return_value=mock_commits):
+                    with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                        result = cli._execute_release_diff_command('v1.0.0', 'v1.1.0')
+                        assert result == 0
+                        output = mock_stdout.getvalue()
+                        assert 'Commits between v1.0.0 and v1.1.0' in output
+                        assert 'Found 2 commits' in output
+                        assert 'abc1234' in output
+                        assert 'feat: add new feature' in output
+        
+        # Test not in git repository
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=False):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli._execute_release_diff_command('v1.0.0', 'v1.1.0')
+                assert result == 1
+                output = mock_stdout.getvalue()
+                assert 'Not in a git repository' in output
+        
+        # Test invalid tag
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_git_tags', return_value=['v1.1.0', 'v1.0.0']):
+                with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                    result = cli._execute_release_diff_command('v2.0.0', 'v1.1.0')
+                    assert result == 1
+                    output = mock_stdout.getvalue()
+                    assert "Tag 'v2.0.0' does not exist" in output
+                    assert 'Available tags:' in output
+        
+        # Test no commits between tags
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_git_tags', return_value=['v1.1.0', 'v1.0.0']):
+                with mock.patch.object(cli.git_manager, 'get_commits_between_tags', return_value=[]):
+                    with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                        result = cli._execute_release_diff_command('v1.0.0', 'v1.1.0')
+                        assert result == 0
+                        output = mock_stdout.getvalue()
+                        assert 'No commits found between' in output
+        
+        # Test git error
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_git_tags', side_effect=GitError("Git failed")):
+                with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                    result = cli._execute_release_diff_command('v1.0.0', 'v1.1.0')
+                    assert result == 1
+                    output = mock_stdout.getvalue()
+                    assert 'Error retrieving git tags' in output
+    
+    def test_execute_release_last_command():
+        cli = CLIInterface()
+        
+        # Test successful release last with existing tag
+        mock_commits = [
+            {'hash': 'abc1234567', 'message': 'feat: add new feature', 'author': 'Test User', 'date': '2023-01-01T10:00:00'},
+            {'hash': 'def5678901', 'message': 'fix: resolve bug', 'author': 'Test User', 'date': '2023-01-02T10:00:00'}
+        ]
+        
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_latest_tag', return_value='v1.0.0'):
+                with mock.patch.object(cli.git_manager, 'get_commits_since_tag', return_value=mock_commits):
+                    with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                        result = cli._execute_release_last_command()
+                        assert result == 0
+                        output = mock_stdout.getvalue()
+                        assert 'Latest tag: v1.0.0' in output
+                        assert 'Found 2 commits since v1.0.0' in output
+                        assert 'abc1234' in output
+        
+        # Test no commits since last tag
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_latest_tag', return_value='v1.0.0'):
+                with mock.patch.object(cli.git_manager, 'get_commits_since_tag', return_value=[]):
+                    with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                        result = cli._execute_release_last_command()
+                        assert result == 0
+                        output = mock_stdout.getvalue()
+                        assert 'No commits found since v1.0.0' in output
+                        assert 'up to date' in output
+        
+        # Test no tags exist - show all commits
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_latest_tag', side_effect=GitError("No tags found")):
+                with mock.patch.object(cli.git_manager, 'get_all_commits_since_beginning', return_value=mock_commits):
+                    with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                        result = cli._execute_release_last_command()
+                        assert result == 0
+                        output = mock_stdout.getvalue()
+                        assert 'No git tags found' in output
+                        assert 'showing all commits from repository beginning' in output
+                        assert 'Found 2 total commits' in output
+        
+        # Test not in git repository
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=False):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli._execute_release_last_command()
+                assert result == 1
+                output = mock_stdout.getvalue()
+                assert 'Not in a git repository' in output
+        
+        # Test no commits in repository
+        with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+            with mock.patch.object(cli.git_manager, 'get_latest_tag', side_effect=GitError("No tags found")):
+                with mock.patch.object(cli.git_manager, 'get_all_commits_since_beginning', return_value=[]):
+                    with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                        result = cli._execute_release_last_command()
+                        assert result == 0
+                        output = mock_stdout.getvalue()
+                        assert 'No commits found in this repository' in output
+    
+    def test_format_commit_history():
+        cli = CLIInterface()
+        
+        # Test formatting with multiple commits
+        commits = [
+            {'hash': 'abc1234567890', 'message': 'feat: add new feature', 'author': 'Alice', 'date': '2023-01-01T10:00:00'},
+            {'hash': 'def5678901234', 'message': 'fix: resolve bug', 'author': 'Bob', 'date': '2023-01-02T10:00:00'},
+            {'hash': 'ghi9012345678', 'message': 'docs: update readme', 'author': 'Alice', 'date': '2023-01-03T10:00:00'}
+        ]
+        
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            cli._format_commit_history(commits, show_stats=True)
+            output = mock_stdout.getvalue()
+            
+            # Check commit display
+            assert 'abc1234  feat: add new feature' in output
+            assert 'Author: Alice' in output
+            assert 'Date: 2023-01-01' in output
+            assert 'def5678  fix: resolve bug' in output
+            assert 'Author: Bob' in output
+            
+            # Check statistics
+            assert 'Total commits: 3' in output
+            assert 'Contributors: 2' in output
+            assert 'Alice, Bob' in output
+            assert 'Date range: 2023-01-01 to 2023-01-03' in output
+            assert 'Breakdown:' in output
+            assert '1 features' in output
+            assert '1 bug fixes' in output
+            assert '1 documentation' in output
+        
+        # Test with no commits
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            cli._format_commit_history([], show_stats=True)
+            output = mock_stdout.getvalue()
+            assert 'No commits to display' in output
+        
+        # Test without statistics
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            cli._format_commit_history(commits[:1], show_stats=False)
+            output = mock_stdout.getvalue()
+            assert 'abc1234  feat: add new feature' in output
+            assert 'Total commits:' not in output
+    
     def test_execute_command_routing():
         cli = CLIInterface()
         
@@ -1819,6 +2200,18 @@ def test_cli_interface():
             release_prepare=False
         )
         
+        mock_args_release_diff = argparse.Namespace(
+            view=False, patch=False, minor=False, major=False,
+            release_info=False, release_diff=['v1.0.0', 'v1.1.0'], release_last=False,
+            release_prepare=False
+        )
+        
+        mock_args_release_last = argparse.Namespace(
+            view=False, patch=False, minor=False, major=False,
+            release_info=False, release_diff=None, release_last=True,
+            release_prepare=False
+        )
+        
         # Test view command routing
         with mock.patch.object(cli, '_execute_view_command', return_value=0) as mock_view:
             result = cli.execute_command(mock_args_view)
@@ -1830,6 +2223,18 @@ def test_cli_interface():
             result = cli.execute_command(mock_args_patch)
             assert result == 0
             mock_increment.assert_called_once_with('patch')
+        
+        # Test release diff command routing
+        with mock.patch.object(cli, '_execute_release_diff_command', return_value=0) as mock_diff:
+            result = cli.execute_command(mock_args_release_diff)
+            assert result == 0
+            mock_diff.assert_called_once_with('v1.0.0', 'v1.1.0')
+        
+        # Test release last command routing
+        with mock.patch.object(cli, '_execute_release_last_command', return_value=0) as mock_last:
+            result = cli.execute_command(mock_args_release_last)
+            assert result == 0
+            mock_last.assert_called_once()
         
         # Test error handling
         with mock.patch.object(cli, '_execute_view_command', side_effect=VersionError("Test error")):

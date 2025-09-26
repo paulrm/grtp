@@ -74,7 +74,7 @@
   - Add integration tests for release info generation
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 9. Implement git diff and commit history commands
+- [x] 9. Implement git diff and commit history commands
   - Create release_diff method to show commits between specific tags
   - Create release_last method to show commits since last tag
   - Implement commit formatting for readable output

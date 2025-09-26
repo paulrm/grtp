@@ -46,4 +46,11 @@ VERSION_FILES = [
     }
 ]
 
+## Roadmap 
+
+- Add Release Name generator for mayor and minor releases
+- Add support for pre-release and build metadata (e.g., v1.0.0-alpha, v1.0.0+build.1)
+- Add --log to log to system log
+- Unhardcode VERSION_FILES to a config file .v-and-r.json or .v-and-r.yaml
+
 
