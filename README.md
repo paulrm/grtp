@@ -58,16 +58,22 @@ ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
    python v-and-r.py --release-info
    ```
 
-> **Note:** The `--view` command now shows the next version by default. You can combine `--view` with increment flags (`-p`, `-mi`, `-ma`) to preview what the next version would be without actually modifying any files. When increment flags are used without `--view`, they perform the actual version increment.
+> **Note:** The `--view` command now shows comprehensive project information including:
+> - Current versions across all configured files
+> - Next version preview (patch by default, or specify `-mi`/`-ma` for minor/major)
+> - Last git tag and commits since that tag (when in a git repository)
+> - Contributor information and commit statistics
+> 
+> You can combine `--view` with increment flags (`-p`, `-mi`, `-ma`) to preview what the next version would be without actually modifying any files. When increment flags are used without `--view`, they perform the actual version increment.
 
 ## Command Reference
 
 | Command | Short | Description |
 |---------|-------|-------------|
-| `--view` | `-v` | Show current versions across all configured files with next patch version (default) |
-| `--view --patch` | `-v -p` | Show current versions with next patch version |
-| `--view --minor` | `-v -mi` | Show current versions with next minor version |
-| `--view --major` | `-v -ma` | Show current versions with next major version |
+| `--view` | `-v` | Show current versions, next patch version, last git tag, and recent commits (default) |
+| `--view --patch` | `-v -p` | Show current versions with next patch version and git info |
+| `--view --minor` | `-v -mi` | Show current versions with next minor version and git info |
+| `--view --major` | `-v -ma` | Show current versions with next major version and git info |
 | `--patch` | `-p` | Increment patch version (bug fixes) |
 | `--minor` | `-mi` | Increment minor version (new features) |
 | `--major` | `-ma` | Increment major version (breaking changes) |
@@ -186,11 +192,20 @@ VERSION_FILES = [
 # Check current versions
 python v-and-r.py --view
 # Output:
-# Current versions found:
+# Current versions across configured files:
 # README.md: v1.2.3
 # src/app.py: v1.2.3
 # src/__init__.py: v1.2.3
 # Highest version: v1.2.3
+# Next patch version: v1.2.4
+# 
+# Git Information:
+# Last tag: v1.2.0
+# Commits since v1.2.0 (3 commits):
+# abc1234  Fix critical bug in authentication
+# def5678  Update documentation  
+# ghi9012  Refactor user management
+# Total commits since v1.2.0: 3
 
 # Increment patch version for bug fix
 python v-and-r.py --patch
@@ -460,13 +475,19 @@ Use glob patterns for recursive directory scanning:
 ## Roadmap
 - [x] Issue: missing `--release-deploy` execute the git tag v1.0.0 -m "Release Name"
 - [x] Issue: missing `-rd TAG` get the last commits from TAG to HEAD
-- [ ] Add Next version in --view with -p or -mi or -ma (use -p as default)
+- [x] Add Next version in --view with -p or -mi or -ma (use -p as default)
+- [ ] Improve `--view` output 🚧
 - [ ] Add --release-prepare  with -p or -mi or -ma and use Next version (use -p as default)
 - [ ] Make commit before tag
+- [ ] Move documentation to /docs dir
+- [ ] Add usefull commands
+    - custom list of commits
+    - custom list of tags
 - [ ] Add Release Name generator for major and minor releases
 - [ ] Add support for pre-release and build metadata (e.g., v1.0.0-alpha, v1.0.0+build.1)
 - [ ] Add `--dry-run` flag for testing changes without applying them
 - [ ] Add `--log` option to log operations to system log
+- [ ] Improve even more the `--view` output
 - [ ] Support external configuration files (.v-and-r.json or .v-and-r.yaml)
 - [ ] Add plugin system for custom version increment strategies
 - [ ] Support for monorepo version management
@@ -478,3 +499,4 @@ Use glob patterns for recursive directory scanning:
 MIT License - see LICENSE file for details.
 
 
+# Modified content

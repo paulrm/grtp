@@ -852,6 +852,90 @@ class GitManager:
             raise GitError("Git tag creation command timed out")
         except (FileNotFoundError, OSError) as e:
             raise GitError(f"Git command failed: {e}")
+    
+    def get_git_status(self) -> Dict[str, List[str]]:
+        """
+        Get git status information including modified, untracked, and staged files.
+        
+        Returns:
+            Dictionary with keys: 'modified', 'untracked', 'staged', 'deleted'
+            Each key maps to a list of file paths
+            
+        Raises:
+            GitError: If git command fails or not in a git repository
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        try:
+            # Use git status --porcelain for machine-readable output
+            result = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                raise GitError(f"Git status command failed: {result.stderr}")
+            
+            status = {
+                'modified': [],      # Modified files not staged
+                'untracked': [],     # Untracked files
+                'staged': [],        # Staged files (ready to commit)
+                'deleted': []        # Deleted files
+            }
+            
+            # Parse git status --porcelain output
+            # Format: XY filename
+            # X = index status, Y = working tree status
+            for line in result.stdout.split('\n'):
+                if not line.strip():
+                    continue
+                
+                if len(line) < 3:
+                    continue
+                
+                index_status = line[0]
+                worktree_status = line[1]
+                filename = line[3:]  # Skip the two status chars and space
+                
+                # Untracked files
+                if index_status == '?' and worktree_status == '?':
+                    status['untracked'].append(filename)
+                # Modified files (not staged)
+                elif worktree_status == 'M':
+                    status['modified'].append(filename)
+                # Deleted files (not staged)
+                elif worktree_status == 'D':
+                    status['deleted'].append(filename)
+                # Staged files (ready to commit)
+                elif index_status in ['A', 'M', 'D', 'R', 'C']:
+                    status['staged'].append(filename)
+            
+            return status
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git status command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
+    
+    def has_uncommitted_changes(self) -> bool:
+        """
+        Check if there are any uncommitted changes in the working directory.
+        
+        Returns:
+            True if there are uncommitted changes, False otherwise
+            
+        Raises:
+            GitError: If git command fails or not in a git repository
+        """
+        try:
+            status = self.get_git_status()
+            return bool(status['modified'] or status['untracked'] or status['staged'] or status['deleted'])
+        except GitError:
+            # If we can't get status, assume there might be changes
+            return True
 
 
 # VERSION_FILES Configuration
@@ -1311,8 +1395,201 @@ Configuration:
             print(f"\nWarning: Could not determine highest version: {e}")
             logger.warning(f"Could not determine highest version: {e}")
         
+        # Add git information if in a git repository
+        self._display_git_information()
+        
         logger.info("View command completed successfully")
         return 0
+    
+    def _display_git_information(self) -> None:
+        """
+        Display git information including last tag and commits since last tag.
+        This method gracefully handles cases where git is not available or no tags exist.
+        """
+        logger = logging.getLogger('v-and-r')
+        
+        # Check if we're in a git repository
+        if not self.git_manager.is_git_repository():
+            logger.debug("Not in a git repository, skipping git information")
+            return
+        
+        print("\n" + "=" * 50)
+        print("Git Information:")
+        print()
+        
+        try:
+            # Get the latest tag
+            try:
+                latest_tag = self.git_manager.get_latest_tag()
+                print(f"Last tag: {latest_tag}")
+                logger.debug(f"Latest git tag: {latest_tag}")
+                
+                # Get commits since the latest tag
+                try:
+                    commits = self.git_manager.get_commits_since_tag(latest_tag)
+                    
+                    if commits:
+                        print(f"\nCommits since {latest_tag} ({len(commits)} commits):")
+                        print()
+                        
+                        # Display commits with formatting similar to other commands
+                        for commit in commits:
+                            commit_hash = commit['hash'][:7]  # Short hash
+                            commit_message = commit['message']
+                            commit_author = commit['author']
+                            commit_date = commit['date'][:10]  # Just the date part
+                            
+                            print(f"{commit_hash}  {commit_message}")
+                            print(f"         Author: {commit_author}")
+                            print(f"         Date: {commit_date}")
+                            print()
+                        
+                        print("-" * 50)
+                        print(f"Total commits since {latest_tag}: {len(commits)}")
+                        
+                        # Show contributors
+                        contributors = set(commit['author'] for commit in commits)
+                        if len(contributors) == 1:
+                            print(f"Contributor: {list(contributors)[0]}")
+                        else:
+                            print(f"Contributors: {len(contributors)}")
+                            for contributor in sorted(contributors):
+                                print(f"  {contributor}")
+                        
+                    else:
+                        print(f"\nNo commits since {latest_tag}")
+                        print("Current HEAD is at the same commit as the last tag")
+                        
+                except GitError as e:
+                    print(f"\nWarning: Could not retrieve commits since {latest_tag}: {e}")
+                    logger.warning(f"Could not retrieve commits since tag: {e}")
+                    
+            except GitError as e:
+                # No tags exist, show all commits from beginning
+                print("No git tags found")
+                logger.debug("No git tags found, showing all commits")
+                
+                try:
+                    commits = self.git_manager.get_all_commits_since_beginning()
+                    
+                    if commits:
+                        print(f"\nAll commits in repository ({len(commits)} commits):")
+                        print()
+                        
+                        # Show only the last 5 commits to avoid overwhelming output
+                        display_commits = commits[:5]
+                        
+                        for commit in display_commits:
+                            commit_hash = commit['hash'][:7]  # Short hash
+                            commit_message = commit['message']
+                            commit_author = commit['author']
+                            commit_date = commit['date'][:10]  # Just the date part
+                            
+                            print(f"{commit_hash}  {commit_message}")
+                            print(f"         Author: {commit_author}")
+                            print(f"         Date: {commit_date}")
+                            print()
+                        
+                        if len(commits) > 5:
+                            print(f"... and {len(commits) - 5} more commits")
+                            print()
+                        
+                        print("-" * 50)
+                        print(f"Total commits in repository: {len(commits)}")
+                        
+                        # Show contributors
+                        contributors = set(commit['author'] for commit in commits)
+                        if len(contributors) == 1:
+                            print(f"Contributor: {list(contributors)[0]}")
+                        else:
+                            print(f"Contributors: {len(contributors)}")
+                            for contributor in sorted(contributors):
+                                print(f"  {contributor}")
+                    else:
+                        print("\nNo commits found in repository")
+                        
+                except GitError as e:
+                    print(f"\nWarning: Could not retrieve commit history: {e}")
+                    logger.warning(f"Could not retrieve commit history: {e}")
+            
+            # Display git status information
+            self._display_git_status()
+                    
+        except Exception as e:
+            print(f"\nWarning: Unexpected error retrieving git information: {e}")
+            logger.warning(f"Unexpected error in git information display: {e}")
+    
+    def _display_git_status(self) -> None:
+        """
+        Display git working directory status including modified and untracked files.
+        This method gracefully handles cases where git status cannot be retrieved.
+        """
+        logger = logging.getLogger('v-and-r')
+        
+        try:
+            status = self.git_manager.get_git_status()
+            
+            # Check if there are any changes to display
+            has_changes = bool(
+                status['modified'] or status['untracked'] or 
+                status['staged'] or status['deleted']
+            )
+            
+            if not has_changes:
+                print("\nWorking directory clean - no uncommitted changes")
+                return
+            
+            print("\n" + "-" * 50)
+            print("Working Directory Status:")
+            print()
+            
+            # Show staged files (ready to commit)
+            if status['staged']:
+                print("Changes to be committed:")
+                for file_path in sorted(status['staged']):
+                    print(f"  modified:   {file_path}")
+                print()
+            
+            # Show modified files (not staged for commit)
+            if status['modified']:
+                print("Changes not staged for commit:")
+                for file_path in sorted(status['modified']):
+                    print(f"  modified:   {file_path}")
+                print()
+            
+            # Show deleted files (not staged for commit)
+            if status['deleted']:
+                if not status['modified']:  # Only show header if not already shown
+                    print("Changes not staged for commit:")
+                for file_path in sorted(status['deleted']):
+                    print(f"  deleted:    {file_path}")
+                print()
+            
+            # Show untracked files
+            if status['untracked']:
+                print("Untracked files:")
+                for file_path in sorted(status['untracked']):
+                    print(f"  {file_path}")
+                print()
+            
+            # Show summary
+            total_changes = len(status['modified']) + len(status['deleted']) + len(status['staged'])
+            total_untracked = len(status['untracked'])
+            
+            summary_parts = []
+            if total_changes > 0:
+                summary_parts.append(f"{total_changes} changed file{'s' if total_changes != 1 else ''}")
+            if total_untracked > 0:
+                summary_parts.append(f"{total_untracked} untracked file{'s' if total_untracked != 1 else ''}")
+            
+            if summary_parts:
+                print(f"Summary: {', '.join(summary_parts)}")
+                
+        except GitError as e:
+            logger.debug(f"Could not retrieve git status: {e}")
+            # Don't show error to user as this is supplementary information
+        except Exception as e:
+            logger.warning(f"Unexpected error retrieving git status: {e}")
     
     def _execute_increment_command(self, increment_type: str) -> int:
         """
