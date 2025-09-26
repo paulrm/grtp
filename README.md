@@ -1,5 +1,7 @@
 # Version and Release
 
+- v1.0.0
+
 create script python that helps to manage version and release of a project
 
 The script finds the highest version across all files, increments it,

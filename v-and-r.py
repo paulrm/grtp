@@ -778,27 +778,669 @@ class GitManager:
 # VERSION_FILES Configuration
 VERSION_FILES = [
     {
-        'file': 'app.py',
+        'file': 'README.md', 
+        'pattern': re.compile(r'- Version (v\d+\.\d+\.\d+)'),
+        'template': '- Version {version}',
+    },    
+    {
+        'file': 'sample/*.py',
         'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
         'template': 'version = "{version}"',
     },
     {
-        'file': 'README.md', 
-        'pattern': re.compile(r'- Version (v\d+\.\d+\.\d+)'),
-        'template': '- Version {version}',
-    },
-    {
-        'file': 'dags/*.py',
+        'file': 'sample/*.py',
         'pattern': re.compile(r'Version: (v\d+\.\d+\.\d+)'),
         'template': 'Version: {version}',
     }
 ]
 
 
+class CLIInterface:
+    """Main CLI interface for v-and-r tool with argument parsing and command execution"""
+    
+    def __init__(self):
+        """Initialize CLI interface with managers"""
+        self.version_manager = VersionManager()
+        self.file_manager = FileManager(VERSION_FILES)
+        self.git_manager = GitManager()
+    
+    def parse_arguments(self) -> argparse.Namespace:
+        """
+        Parse command-line arguments and return parsed namespace.
+        
+        Returns:
+            Parsed arguments namespace
+            
+        Raises:
+            SystemExit: If invalid arguments provided or help requested
+        """
+        parser = argparse.ArgumentParser(
+            prog='v-and-r',
+            description='Version and Release Manager - Automate version management and release processes',
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
+Examples:
+  v-and-r                    # View current versions (default)
+  v-and-r -v                 # View current versions
+  v-and-r --view             # View current versions
+  v-and-r -p                 # Increment patch version
+  v-and-r --patch            # Increment patch version
+  v-and-r -mi                # Increment minor version
+  v-and-r --minor            # Increment minor version
+  v-and-r -ma                # Increment major version
+  v-and-r --major            # Increment major version
+  v-and-r -r                 # Generate release information
+  v-and-r --release-info     # Generate release information
+  v-and-r -rd v1.0.0 v1.1.0  # Show commits between tags
+  v-and-r --release-diff v1.0.0 v1.1.0  # Show commits between tags
+  v-and-r -rl                # Show commits since last tag
+  v-and-r --release-last     # Show commits since last tag
+  v-and-r -rp                # Prepare release documentation
+  v-and-r --release-prepare  # Prepare release documentation
+
+Configuration:
+  The tool uses VERSION_FILES configuration embedded in the script.
+  Modify the VERSION_FILES array to customize file patterns, regex patterns,
+  and templates for your project structure.
+            """
+        )
+        
+        # Create mutually exclusive group for main commands
+        command_group = parser.add_mutually_exclusive_group()
+        
+        # View command (default)
+        command_group.add_argument(
+            '-v', '--view',
+            action='store_true',
+            help='View current versions across all configured files (default behavior)'
+        )
+        
+        # Version increment commands
+        command_group.add_argument(
+            '-p', '--patch',
+            action='store_true',
+            help='Increment patch version (e.g., v1.2.3 -> v1.2.4)'
+        )
+        
+        command_group.add_argument(
+            '-mi', '--minor',
+            action='store_true',
+            help='Increment minor version and reset patch (e.g., v1.2.3 -> v1.3.0)'
+        )
+        
+        command_group.add_argument(
+            '-ma', '--major',
+            action='store_true',
+            help='Increment major version and reset minor/patch (e.g., v1.2.3 -> v2.0.0)'
+        )
+        
+        # Release management commands
+        command_group.add_argument(
+            '-r', '--release-info',
+            action='store_true',
+            help='Generate release information and version.json file'
+        )
+        
+        command_group.add_argument(
+            '-rd', '--release-diff',
+            nargs=2,
+            metavar=('TAG1', 'TAG2'),
+            help='Show commits between two git tags (TAG1 to TAG2)'
+        )
+        
+        command_group.add_argument(
+            '-rl', '--release-last',
+            action='store_true',
+            help='Show commits since the last git tag'
+        )
+        
+        command_group.add_argument(
+            '-rp', '--release-prepare',
+            action='store_true',
+            help='Prepare release documentation (update version.json, CHANGELOG.md, RELEASES.md)'
+        )
+        
+        # Parse arguments
+        args = parser.parse_args()
+        
+        # Validate argument combinations
+        self._validate_arguments(args)
+        
+        return args
+    
+    def _validate_arguments(self, args: argparse.Namespace) -> None:
+        """
+        Validate parsed arguments for invalid combinations.
+        
+        Args:
+            args: Parsed arguments namespace
+            
+        Raises:
+            SystemExit: If invalid argument combinations detected
+        """
+        # Check for release-diff argument validation
+        if args.release_diff:
+            tag1, tag2 = args.release_diff
+            if not tag1 or not tag2:
+                print("Error: Both TAG1 and TAG2 must be provided for --release-diff")
+                sys.exit(1)
+            
+            if tag1 == tag2:
+                print("Error: TAG1 and TAG2 cannot be the same for --release-diff")
+                sys.exit(1)
+        
+        # If no command specified, default to view
+        if not any([
+            args.view, args.patch, args.minor, args.major,
+            args.release_info, args.release_diff, args.release_last,
+            args.release_prepare
+        ]):
+            args.view = True
+    
+    def execute_command(self, args: argparse.Namespace) -> int:
+        """
+        Execute the appropriate command based on parsed arguments.
+        
+        Args:
+            args: Parsed arguments namespace
+            
+        Returns:
+            Exit code (0 for success, non-zero for failure)
+        """
+        try:
+            if args.view:
+                return self._execute_view_command()
+            elif args.patch:
+                return self._execute_increment_command('patch')
+            elif args.minor:
+                return self._execute_increment_command('minor')
+            elif args.major:
+                return self._execute_increment_command('major')
+            elif args.release_info:
+                return self._execute_release_info_command()
+            elif args.release_diff:
+                return self._execute_release_diff_command(args.release_diff[0], args.release_diff[1])
+            elif args.release_last:
+                return self._execute_release_last_command()
+            elif args.release_prepare:
+                return self._execute_release_prepare_command()
+            else:
+                # Default to view if no command specified
+                return self._execute_view_command()
+                
+        except (VAndRError, VersionError, FileError, GitError) as e:
+            print(f"Error: {e}")
+            return 1
+        except KeyboardInterrupt:
+            print("\nOperation cancelled by user")
+            return 130
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            return 1
+    
+    def _execute_view_command(self) -> int:
+        """
+        Execute view command to display current versions.
+        
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print("v-and-r (Version and Release Manager)")
+        print("=" * 50)
+        print("Current versions across configured files:")
+        print()
+        
+        try:
+            versions_found = self.file_manager.find_versions_in_files()
+            
+            if not versions_found:
+                print("No versions found in any configured files.")
+                print("\nConfigured file patterns:")
+                for config in self.file_manager.file_configs:
+                    print(f"  - {config.file_pattern}")
+                return 0
+            
+            # Display found versions
+            for file_path, version in versions_found.items():
+                print(f"  {file_path}: {version}")
+            
+            # Highlight highest version if multiple versions exist
+            if len(versions_found) > 1:
+                try:
+                    highest_version = self.version_manager.find_highest_version(list(versions_found.values()))
+                    print(f"\nHighest version: {highest_version}")
+                except VersionError as e:
+                    print(f"\nWarning: Could not determine highest version: {e}")
+            
+            return 0
+            
+        except FileError as e:
+            print(f"File error: {e}")
+            return 1
+    
+    def _execute_increment_command(self, increment_type: str) -> int:
+        """
+        Execute version increment command.
+        
+        Args:
+            increment_type: Type of increment ('patch', 'minor', 'major')
+            
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print(f"v-and-r: Incrementing {increment_type} version")
+        print("=" * 50)
+        
+        try:
+            # Find current versions
+            versions_found = self.file_manager.find_versions_in_files()
+            
+            if not versions_found:
+                print("Error: No versions found in configured files.")
+                return 1
+            
+            # Find highest version
+            current_version = self.version_manager.find_highest_version(list(versions_found.values()))
+            print(f"Current highest version: {current_version}")
+            
+            # Calculate new version
+            if increment_type == 'patch':
+                new_version = self.version_manager.increment_patch(current_version)
+            elif increment_type == 'minor':
+                new_version = self.version_manager.increment_minor(current_version)
+            elif increment_type == 'major':
+                new_version = self.version_manager.increment_major(current_version)
+            else:
+                raise ValueError(f"Invalid increment type: {increment_type}")
+            
+            print(f"New version: {new_version}")
+            print()
+            
+            # Update all files
+            print("Updating files...")
+            update_results = self.file_manager.update_all_files(new_version)
+            
+            success_count = 0
+            for file_path, success in update_results.items():
+                status = "✓" if success else "✗"
+                print(f"  {status} {file_path}")
+                if success:
+                    success_count += 1
+            
+            print()
+            if success_count == len(update_results):
+                print(f"Successfully updated {success_count} files to version {new_version}")
+                return 0
+            else:
+                print(f"Updated {success_count}/{len(update_results)} files. Some updates failed.")
+                return 1
+                
+        except (VersionError, FileError) as e:
+            print(f"Error: {e}")
+            return 1
+    
+    def _execute_release_info_command(self) -> int:
+        """
+        Execute release info command to generate version.json.
+        
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print("v-and-r: Generating release information")
+        print("=" * 50)
+        
+        # This is a placeholder - full implementation will be in task 8
+        print("Release info generation - implementation pending")
+        return 0
+    
+    def _execute_release_diff_command(self, tag1: str, tag2: str) -> int:
+        """
+        Execute release diff command to show commits between tags.
+        
+        Args:
+            tag1: Starting tag (older)
+            tag2: Ending tag (newer)
+            
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print(f"v-and-r: Commits between {tag1} and {tag2}")
+        print("=" * 50)
+        
+        # This is a placeholder - full implementation will be in task 9
+        print("Release diff - implementation pending")
+        return 0
+    
+    def _execute_release_last_command(self) -> int:
+        """
+        Execute release last command to show commits since last tag.
+        
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print("v-and-r: Commits since last release")
+        print("=" * 50)
+        
+        # This is a placeholder - full implementation will be in task 9
+        print("Release last - implementation pending")
+        return 0
+    
+    def _execute_release_prepare_command(self) -> int:
+        """
+        Execute release prepare command to update documentation.
+        
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print("v-and-r: Preparing release documentation")
+        print("=" * 50)
+        
+        # This is a placeholder - full implementation will be in task 10
+        print("Release prepare - implementation pending")
+        return 0
+
+
 def main():
     """Main entry point for the v-and-r tool"""
-    print("v-and-r (Version and Release Manager)")
-    print("Basic structure initialized - implementation in progress...")
+    cli = CLIInterface()
+    args = cli.parse_arguments()
+    exit_code = cli.execute_command(args)
+    sys.exit(exit_code)
+
+
+# Unit Tests for CLIInterface
+def test_cli_interface():
+    """Comprehensive unit tests for CLIInterface class"""
+    import sys
+    from unittest import mock
+    from io import StringIO
+    
+    test_results = []
+    
+    def run_test(test_name: str, test_func):
+        """Helper to run individual tests and track results"""
+        try:
+            test_func()
+            test_results.append(f"✓ {test_name}")
+            return True
+        except Exception as e:
+            test_results.append(f"✗ {test_name}: {e}")
+            return False
+    
+    # Test argument parsing
+    def test_parse_arguments():
+        cli = CLIInterface()
+        
+        # Test default behavior (no arguments should default to view)
+        with mock.patch('sys.argv', ['v-and-r']):
+            args = cli.parse_arguments()
+            assert args.view == True
+        
+        # Test view command
+        with mock.patch('sys.argv', ['v-and-r', '-v']):
+            args = cli.parse_arguments()
+            assert args.view == True
+        
+        with mock.patch('sys.argv', ['v-and-r', '--view']):
+            args = cli.parse_arguments()
+            assert args.view == True
+        
+        # Test patch command
+        with mock.patch('sys.argv', ['v-and-r', '-p']):
+            args = cli.parse_arguments()
+            assert args.patch == True
+        
+        with mock.patch('sys.argv', ['v-and-r', '--patch']):
+            args = cli.parse_arguments()
+            assert args.patch == True
+        
+        # Test minor command
+        with mock.patch('sys.argv', ['v-and-r', '-mi']):
+            args = cli.parse_arguments()
+            assert args.minor == True
+        
+        with mock.patch('sys.argv', ['v-and-r', '--minor']):
+            args = cli.parse_arguments()
+            assert args.minor == True
+        
+        # Test major command
+        with mock.patch('sys.argv', ['v-and-r', '-ma']):
+            args = cli.parse_arguments()
+            assert args.major == True
+        
+        with mock.patch('sys.argv', ['v-and-r', '--major']):
+            args = cli.parse_arguments()
+            assert args.major == True
+        
+        # Test release info command
+        with mock.patch('sys.argv', ['v-and-r', '-r']):
+            args = cli.parse_arguments()
+            assert args.release_info == True
+        
+        with mock.patch('sys.argv', ['v-and-r', '--release-info']):
+            args = cli.parse_arguments()
+            assert args.release_info == True
+        
+        # Test release diff command
+        with mock.patch('sys.argv', ['v-and-r', '-rd', 'v1.0.0', 'v1.1.0']):
+            args = cli.parse_arguments()
+            assert args.release_diff == ['v1.0.0', 'v1.1.0']
+        
+        with mock.patch('sys.argv', ['v-and-r', '--release-diff', 'v1.0.0', 'v1.1.0']):
+            args = cli.parse_arguments()
+            assert args.release_diff == ['v1.0.0', 'v1.1.0']
+        
+        # Test release last command
+        with mock.patch('sys.argv', ['v-and-r', '-rl']):
+            args = cli.parse_arguments()
+            assert args.release_last == True
+        
+        with mock.patch('sys.argv', ['v-and-r', '--release-last']):
+            args = cli.parse_arguments()
+            assert args.release_last == True
+        
+        # Test release prepare command
+        with mock.patch('sys.argv', ['v-and-r', '-rp']):
+            args = cli.parse_arguments()
+            assert args.release_prepare == True
+        
+        with mock.patch('sys.argv', ['v-and-r', '--release-prepare']):
+            args = cli.parse_arguments()
+            assert args.release_prepare == True
+    
+    def test_argument_validation():
+        cli = CLIInterface()
+        
+        # Test release-diff with same tags (should exit with error)
+        with mock.patch('sys.argv', ['v-and-r', '-rd', 'v1.0.0', 'v1.0.0']):
+            with mock.patch('sys.exit') as mock_exit:
+                cli.parse_arguments()
+                mock_exit.assert_called_with(1)
+        
+        # Test mutually exclusive arguments (should work - argparse handles this)
+        # We can't easily test this without triggering SystemExit, so we'll skip detailed testing
+        # The argparse library handles mutual exclusion automatically
+    
+    def test_execute_view_command():
+        cli = CLIInterface()
+        
+        # Mock file manager to return versions
+        mock_versions = {
+            'app.py': 'v1.2.3',
+            'README.md': 'v1.2.3'
+        }
+        
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli._execute_view_command()
+                assert result == 0
+                output = mock_stdout.getvalue()
+                assert 'app.py: v1.2.3' in output
+                assert 'README.md: v1.2.3' in output
+        
+        # Test no versions found
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value={}):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli._execute_view_command()
+                assert result == 0
+                output = mock_stdout.getvalue()
+                assert 'No versions found' in output
+        
+        # Test file error
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', side_effect=FileError("Test error")):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli._execute_view_command()
+                assert result == 1
+                output = mock_stdout.getvalue()
+                assert 'File error: Test error' in output
+    
+    def test_execute_increment_command():
+        cli = CLIInterface()
+        
+        # Mock successful increment
+        mock_versions = {'app.py': 'v1.2.3'}
+        mock_update_results = {'app.py': True}
+        
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.file_manager, 'update_all_files', return_value=mock_update_results):
+                with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                    result = cli._execute_increment_command('patch')
+                    assert result == 0
+                    output = mock_stdout.getvalue()
+                    assert 'v1.2.3' in output
+                    assert 'v1.2.4' in output
+                    assert '✓ app.py' in output
+        
+        # Test no versions found
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value={}):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli._execute_increment_command('patch')
+                assert result == 1
+                output = mock_stdout.getvalue()
+                assert 'No versions found' in output
+        
+        # Test partial update failure
+        mock_update_results_partial = {'app.py': True, 'README.md': False}
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.file_manager, 'update_all_files', return_value=mock_update_results_partial):
+                with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                    result = cli._execute_increment_command('minor')
+                    assert result == 1
+                    output = mock_stdout.getvalue()
+                    assert 'v1.3.0' in output
+                    assert 'Some updates failed' in output
+    
+    def test_execute_command_routing():
+        cli = CLIInterface()
+        
+        # Create mock args for different commands
+        mock_args_view = argparse.Namespace(
+            view=True, patch=False, minor=False, major=False,
+            release_info=False, release_diff=None, release_last=False,
+            release_prepare=False
+        )
+        
+        mock_args_patch = argparse.Namespace(
+            view=False, patch=True, minor=False, major=False,
+            release_info=False, release_diff=None, release_last=False,
+            release_prepare=False
+        )
+        
+        # Test view command routing
+        with mock.patch.object(cli, '_execute_view_command', return_value=0) as mock_view:
+            result = cli.execute_command(mock_args_view)
+            assert result == 0
+            mock_view.assert_called_once()
+        
+        # Test patch command routing
+        with mock.patch.object(cli, '_execute_increment_command', return_value=0) as mock_increment:
+            result = cli.execute_command(mock_args_patch)
+            assert result == 0
+            mock_increment.assert_called_once_with('patch')
+        
+        # Test error handling
+        with mock.patch.object(cli, '_execute_view_command', side_effect=VersionError("Test error")):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli.execute_command(mock_args_view)
+                assert result == 1
+                output = mock_stdout.getvalue()
+                assert 'Error: Test error' in output
+        
+        # Test keyboard interrupt
+        with mock.patch.object(cli, '_execute_view_command', side_effect=KeyboardInterrupt()):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli.execute_command(mock_args_view)
+                assert result == 130
+                output = mock_stdout.getvalue()
+                assert 'Operation cancelled' in output
+        
+        # Test unexpected error
+        with mock.patch.object(cli, '_execute_view_command', side_effect=RuntimeError("Unexpected")):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                result = cli.execute_command(mock_args_view)
+                assert result == 1
+                output = mock_stdout.getvalue()
+                assert 'Unexpected error' in output
+    
+    def test_placeholder_commands():
+        cli = CLIInterface()
+        
+        # Test placeholder commands return 0 and print appropriate messages
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            result = cli._execute_release_info_command()
+            assert result == 0
+            output = mock_stdout.getvalue()
+            assert 'implementation pending' in output
+        
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            result = cli._execute_release_diff_command('v1.0.0', 'v1.1.0')
+            assert result == 0
+            output = mock_stdout.getvalue()
+            assert 'implementation pending' in output
+        
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            result = cli._execute_release_last_command()
+            assert result == 0
+            output = mock_stdout.getvalue()
+            assert 'implementation pending' in output
+        
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            result = cli._execute_release_prepare_command()
+            assert result == 0
+            output = mock_stdout.getvalue()
+            assert 'implementation pending' in output
+    
+    # Run all tests
+    print("\nRunning CLIInterface unit tests...")
+    print("=" * 50)
+    
+    tests = [
+        ("parse_arguments", test_parse_arguments),
+        ("argument_validation", test_argument_validation),
+        ("execute_view_command", test_execute_view_command),
+        ("execute_increment_command", test_execute_increment_command),
+        ("execute_command_routing", test_execute_command_routing),
+        ("placeholder_commands", test_placeholder_commands),
+    ]
+    
+    passed = 0
+    for test_name, test_func in tests:
+        if run_test(test_name, test_func):
+            passed += 1
+    
+    # Print results
+    for result in test_results:
+        print(result)
+    
+    print("=" * 50)
+    print(f"Tests passed: {passed}/{len(tests)}")
+    
+    if passed == len(tests):
+        print("All CLIInterface tests passed! ✓")
+        return True
+    else:
+        print("Some tests failed! ✗")
+        return False
 
 
 # Unit Tests for VersionManager
@@ -1680,11 +2322,12 @@ if __name__ == "__main__":
         print("Running all unit tests for v-and-r...")
         print("=" * 60)
         
+        cli_success = test_cli_interface()
         version_success = test_version_manager()
         file_success = test_file_manager()
         git_success = test_git_manager()
         
-        overall_success = version_success and file_success and git_success
+        overall_success = cli_success and version_success and file_success and git_success
         
         print("\n" + "=" * 60)
         if overall_success:
