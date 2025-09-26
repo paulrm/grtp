@@ -52,6 +52,7 @@
   - Implement version display formatting showing file paths and detected versions
   - Add logic to highlight the highest version when multiple versions exist
   - Handle cases where no versions are found in files
+  - Add a sample dir and put files for testing
   - Add integration tests for view command with sample files
   - _Requirements: 1.1, 1.2, 1.3_
 
