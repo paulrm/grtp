@@ -775,6 +775,83 @@ class GitManager:
             raise GitError("Git log command timed out")
         except (FileNotFoundError, OSError) as e:
             raise GitError(f"Git command failed: {e}")
+    
+    def tag_exists(self, tag_name: str) -> bool:
+        """
+        Check if a git tag already exists.
+        
+        Args:
+            tag_name: Name of the tag to check
+            
+        Returns:
+            True if tag exists, False otherwise
+            
+        Raises:
+            GitError: If git command fails or not in a git repository
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', '--verify', f'refs/tags/{tag_name}'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            return result.returncode == 0
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git tag check command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
+    
+    def create_git_tag(self, tag_name: str, message: Optional[str] = None) -> bool:
+        """
+        Create a git tag with optional annotated message.
+        
+        Args:
+            tag_name: Name of the tag to create
+            message: Optional message for annotated tag
+            
+        Returns:
+            True if tag was created successfully, False otherwise
+            
+        Raises:
+            GitError: If git command fails, not in a git repository, or tag already exists
+        """
+        if not self.is_git_repository():
+            raise GitError("Not in a git repository")
+        
+        # Check if tag already exists
+        if self.tag_exists(tag_name):
+            raise GitError(f"Tag '{tag_name}' already exists")
+        
+        try:
+            # Build git tag command
+            if message:
+                # Create annotated tag with message
+                cmd = ['git', 'tag', '-a', tag_name, '-m', message]
+            else:
+                # Create lightweight tag
+                cmd = ['git', 'tag', tag_name]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                raise GitError(f"Git tag creation failed: {result.stderr}")
+            
+            return True
+            
+        except subprocess.TimeoutExpired:
+            raise GitError("Git tag creation command timed out")
+        except (FileNotFoundError, OSError) as e:
+            raise GitError(f"Git command failed: {e}")
 
 
 # VERSION_FILES Configuration
@@ -946,6 +1023,8 @@ Examples:
   v-and-r --release-last     # Show commits since last tag
   v-and-r -rp                # Prepare release documentation
   v-and-r --release-prepare  # Prepare release documentation
+  v-and-r --release-deploy   # Create git tag for current version
+  v-and-r --release-deploy -m "Release v1.2.3"  # Create annotated git tag
 
 Configuration:
   The tool uses VERSION_FILES configuration embedded in the script.
@@ -1009,6 +1088,19 @@ Configuration:
             help='Prepare release documentation (update version.json, CHANGELOG.md, RELEASES.md)'
         )
         
+        command_group.add_argument(
+            '--release-deploy',
+            action='store_true',
+            help='Create git tag for current version to deploy release'
+        )
+        
+        # Message option for annotated git tags (not mutually exclusive)
+        parser.add_argument(
+            '-m', '--message',
+            type=str,
+            help='Specify release message for annotated git tag (used with --release-deploy)'
+        )
+        
         # Debug and utility flags (not mutually exclusive)
         parser.add_argument(
             '-d', '--debug',
@@ -1045,11 +1137,16 @@ Configuration:
                 print("Error: TAG1 and TAG2 cannot be the same for --release-diff")
                 sys.exit(1)
         
+        # Validate message option usage
+        if hasattr(args, 'message') and args.message and not args.release_deploy:
+            print("Error: -m/--message option can only be used with --release-deploy")
+            sys.exit(1)
+        
         # If no command specified, default to view
         if not any([
             args.view, args.patch, args.minor, args.major,
             args.release_info, args.release_diff, args.release_last,
-            args.release_prepare
+            args.release_prepare, args.release_deploy
         ]):
             args.view = True
     
@@ -1081,6 +1178,8 @@ Configuration:
             command_name = "release-last"
         elif args.release_prepare:
             command_name = "release-prepare"
+        elif args.release_deploy:
+            command_name = "release-deploy"
         
         logger.info(f"Executing command: {command_name}")
         
@@ -1101,6 +1200,9 @@ Configuration:
             return self._execute_release_last_command()
         elif args.release_prepare:
             return self._execute_release_prepare_command()
+        elif args.release_deploy:
+            message = getattr(args, 'message', None)
+            return self._execute_release_deploy_command(message)
         else:
             # Default to view if no command specified
             return self._execute_view_command()
@@ -2174,6 +2276,102 @@ This document contains release notes and highlights for each version.
         except Exception as e:
             print(f"Unexpected error during release preparation: {e}")
             return 1
+    
+    def _execute_release_deploy_command(self, message: Optional[str] = None) -> int:
+        """
+        Execute release deploy command to create git tag for current version.
+        
+        Args:
+            message: Optional message for annotated git tag
+            
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print("v-and-r: Deploying release with git tag")
+        print("=" * 50)
+        
+        try:
+            # Validate git repository exists
+            if not self.git_manager.is_git_repository():
+                print("Error: Not in a git repository. Git is required for release deployment.")
+                return 1
+            
+            # Find current version from files
+            print("Finding current version...")
+            versions_found = self.file_manager.find_versions_in_files()
+            
+            if not versions_found:
+                print("Error: No versions found in configured files.")
+                print("\nConfigured file patterns:")
+                for config in self.file_manager.file_configs:
+                    print(f"  - {config.file_pattern}")
+                return 1
+            
+            # Display found versions
+            print("Current versions found:")
+            for file_path, version in versions_found.items():
+                print(f"  {file_path}: {version}")
+            print()
+            
+            # Get highest version to use as tag name
+            current_version = self.version_manager.find_highest_version(list(versions_found.values()))
+            print(f"Using version for tag: {current_version}")
+            
+            # Check if tag already exists
+            if self.git_manager.tag_exists(current_version):
+                print(f"Error: Git tag '{current_version}' already exists.")
+                print("Cannot create duplicate tag. Consider incrementing the version first.")
+                return 1
+            
+            # Display tag creation details
+            if message:
+                print(f"Creating annotated git tag '{current_version}' with message: '{message}'")
+            else:
+                print(f"Creating lightweight git tag '{current_version}'")
+            
+            # Get confirmation from user
+            try:
+                confirmation = input(f"Proceed with creating git tag '{current_version}'? (y/N): ").strip().lower()
+                if confirmation not in ['y', 'yes']:
+                    print("Tag creation cancelled by user.")
+                    return 0
+            except (EOFError, KeyboardInterrupt):
+                print("\nTag creation cancelled by user.")
+                return 0
+            
+            print()
+            print("Creating git tag...")
+            
+            # Create the git tag
+            success = self.git_manager.create_git_tag(current_version, message)
+            
+            if success:
+                print(f"✓ Successfully created git tag '{current_version}'")
+                if message:
+                    print(f"  Tag message: '{message}'")
+                print(f"  Tag points to current HEAD commit")
+                
+                # Show additional information
+                try:
+                    commit_hash = self.git_manager.get_current_commit_hash()
+                    print(f"  Commit hash: {commit_hash}")
+                except GitError:
+                    pass  # Don't fail if we can't get commit hash
+                
+                print("\nRelease deployment completed successfully!")
+                print(f"You can now push the tag with: git push origin {current_version}")
+                
+                return 0
+            else:
+                print(f"✗ Failed to create git tag '{current_version}'")
+                return 1
+                
+        except (VAndRError, FileError, GitError) as e:
+            print(f"Error during release deployment: {e}")
+            return 1
+        except Exception as e:
+            print(f"Unexpected error during release deployment: {e}")
+            return 1
 
 
 def setup_logging(debug: bool = False) -> None:
@@ -2443,7 +2641,7 @@ def test_main_execution_flow():
     def test_main_execution_with_mocked_args():
         with mock.patch('sys.argv', ['v-and-r', '--view']):
             with mock.patch.object(CLIInterface, 'execute_command', return_value=0) as mock_execute:
-                exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+                exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
                 assert exit_code == 0
                 mock_execute.assert_called_once()
     
@@ -2451,27 +2649,27 @@ def test_main_execution_flow():
     def test_execute_command_error_handling():
         # Test VAndRError handling - need to mock the CLI creation to raise the error
         with mock.patch('__main__.CLIInterface', side_effect=VAndRError("Test error")):
-            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
             assert exit_code == 2
         
         # Test VersionError handling
         with mock.patch('__main__.CLIInterface', side_effect=VersionError("Test version error")):
-            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
             assert exit_code == 3
         
         # Test FileError handling
         with mock.patch('__main__.CLIInterface', side_effect=FileError("Test file error")):
-            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
             assert exit_code == 4
         
         # Test GitError handling
         with mock.patch('__main__.CLIInterface', side_effect=GitError("Test git error")):
-            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
             assert exit_code == 5
         
         # Test unexpected error handling
         with mock.patch('__main__.CLIInterface', side_effect=RuntimeError("Unexpected error")):
-            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
             assert exit_code == 1
     
     # Run all tests
@@ -3036,25 +3234,31 @@ def test_cli_interface():
         mock_args_view = argparse.Namespace(
             view=True, patch=False, minor=False, major=False,
             release_info=False, release_diff=None, release_last=False,
-            release_prepare=False
+            release_prepare=False, release_deploy=False
         )
         
         mock_args_patch = argparse.Namespace(
             view=False, patch=True, minor=False, major=False,
             release_info=False, release_diff=None, release_last=False,
-            release_prepare=False
+            release_prepare=False, release_deploy=False
         )
         
         mock_args_release_diff = argparse.Namespace(
             view=False, patch=False, minor=False, major=False,
             release_info=False, release_diff=['v1.0.0', 'v1.1.0'], release_last=False,
-            release_prepare=False
+            release_prepare=False, release_deploy=False
         )
         
         mock_args_release_last = argparse.Namespace(
             view=False, patch=False, minor=False, major=False,
             release_info=False, release_diff=None, release_last=True,
-            release_prepare=False
+            release_prepare=False, release_deploy=False
+        )
+        
+        mock_args_release_deploy = argparse.Namespace(
+            view=False, patch=False, minor=False, major=False,
+            release_info=False, release_diff=None, release_last=False,
+            release_prepare=False, release_deploy=True, message=None
         )
         
         # Test view command routing
@@ -3080,6 +3284,12 @@ def test_cli_interface():
             result = cli.execute_command(mock_args_release_last)
             assert result == 0
             mock_last.assert_called_once()
+        
+        # Test release deploy command routing
+        with mock.patch.object(cli, '_execute_release_deploy_command', return_value=0) as mock_deploy:
+            result = cli.execute_command(mock_args_release_deploy)
+            assert result == 0
+            mock_deploy.assert_called_once_with(None)
         
         # Test error handling
         with mock.patch.object(cli, '_execute_view_command', side_effect=VersionError("Test error")):
@@ -4318,6 +4528,123 @@ def test_git_manager():
                 except GitError as e:
                     assert "Git log command failed" in str(e)
     
+    def test_tag_exists():
+        """Test tag_exists method"""
+        gm = GitManager()
+        
+        # Mock non-git repository
+        with mock.patch.object(gm, 'is_git_repository', return_value=False):
+            try:
+                gm.tag_exists('v1.0.0')
+                assert False, "Should raise GitError for non-git repository"
+            except GitError as e:
+                assert "Not in a git repository" in str(e)
+        
+        # Mock successful tag check (tag exists)
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 0
+                
+                result = gm.tag_exists('v1.0.0')
+                assert result is True
+                mock_run.assert_called_once_with(
+                    ['git', 'rev-parse', '--verify', 'refs/tags/v1.0.0'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+        
+        # Mock tag doesn't exist
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run') as mock_run:
+                mock_run.return_value.returncode = 1
+                
+                result = gm.tag_exists('v1.0.0')
+                assert result is False
+        
+        # Mock git command failure
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch('subprocess.run', side_effect=FileNotFoundError("git not found")):
+                try:
+                    gm.tag_exists('v1.0.0')
+                    assert False, "Should raise GitError for git command failure"
+                except GitError as e:
+                    assert "Git command failed" in str(e)
+    
+    def test_create_git_tag():
+        """Test create_git_tag method"""
+        gm = GitManager()
+        
+        # Mock non-git repository
+        with mock.patch.object(gm, 'is_git_repository', return_value=False):
+            try:
+                gm.create_git_tag('v1.0.0')
+                assert False, "Should raise GitError for non-git repository"
+            except GitError as e:
+                assert "Not in a git repository" in str(e)
+        
+        # Mock tag already exists
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch.object(gm, 'tag_exists', return_value=True):
+                try:
+                    gm.create_git_tag('v1.0.0')
+                    assert False, "Should raise GitError for existing tag"
+                except GitError as e:
+                    assert "already exists" in str(e)
+        
+        # Mock successful lightweight tag creation
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch.object(gm, 'tag_exists', return_value=False):
+                with mock.patch('subprocess.run') as mock_run:
+                    mock_run.return_value.returncode = 0
+                    
+                    result = gm.create_git_tag('v1.0.0')
+                    assert result is True
+                    mock_run.assert_called_once_with(
+                        ['git', 'tag', 'v1.0.0'],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+        
+        # Mock successful annotated tag creation
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch.object(gm, 'tag_exists', return_value=False):
+                with mock.patch('subprocess.run') as mock_run:
+                    mock_run.return_value.returncode = 0
+                    
+                    result = gm.create_git_tag('v1.0.0', 'Release v1.0.0')
+                    assert result is True
+                    mock_run.assert_called_once_with(
+                        ['git', 'tag', '-a', 'v1.0.0', '-m', 'Release v1.0.0'],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+        
+        # Mock git tag creation failure
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch.object(gm, 'tag_exists', return_value=False):
+                with mock.patch('subprocess.run') as mock_run:
+                    mock_run.return_value.returncode = 1
+                    mock_run.return_value.stderr = "fatal: tag 'v1.0.0' already exists"
+                    
+                    try:
+                        gm.create_git_tag('v1.0.0')
+                        assert False, "Should raise GitError for failed tag creation"
+                    except GitError as e:
+                        assert "Git tag creation failed" in str(e)
+        
+        # Mock git command not found
+        with mock.patch.object(gm, 'is_git_repository', return_value=True):
+            with mock.patch.object(gm, 'tag_exists', return_value=False):
+                with mock.patch('subprocess.run', side_effect=FileNotFoundError("git not found")):
+                    try:
+                        gm.create_git_tag('v1.0.0')
+                        assert False, "Should raise GitError for git command failure"
+                    except GitError as e:
+                        assert "Git command failed" in str(e)
+    
     # Run all tests
     print("\nRunning GitManager unit tests...")
     print("=" * 50)
@@ -4330,6 +4657,8 @@ def test_git_manager():
         ("get_latest_tag", test_get_latest_tag),
         ("get_current_commit_hash", test_get_current_commit_hash),
         ("get_all_commits_since_beginning", test_get_all_commits_since_beginning),
+        ("tag_exists", test_tag_exists),
+        ("create_git_tag", test_create_git_tag),
     ]
     
     passed = 0

@@ -1,6 +1,10 @@
 # Releases
 
-This document contains release notes and highlights for each version.
+## v0.1.1 - 2025-09-26
+
+**Key Changes:**
+- added ` --release-deploy -m "Release v0.1.1"`
+
 
 ## v0.0.0 - Initial Release - 2025-09-26
 

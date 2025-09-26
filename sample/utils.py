@@ -3,7 +3,7 @@ Utility functions for sample application.
 """
 
 # Version: v0.0.0
-version = "v0.0.1"
+version = "v0.1.1"
 
 def get_version():
     """Return the current version"""

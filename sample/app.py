@@ -5,7 +5,7 @@ Sample application file for testing v-and-r version management.
 """
 
 # Version: v1.2.3
-version = "v0.0.1"
+version = "v0.1.1"
 
 def main():
     """Main application entry point"""

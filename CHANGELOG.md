@@ -1,4 +1,8 @@
 # Changelog
+## [v0.1.1] - 2025-09-26
+### Changed
+- Version bump to v0.1.1
+
 All notable changes to this project will be documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -6,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [v0.0.0] Initial Release- 2025-09-26
+## [v0.0.0] Initial Release - 2025-09-26
 ### Other
 - 🔄 Reset version numbers to v0.0.0 in all project files (dec2637)
 - 🚀 Task 12 / Prototype Final Task / Add VERSION_FILES configuration and documentation (3f48d17)
