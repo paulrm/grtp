@@ -69,6 +69,8 @@ class CLIInterface:
 - `--release-diff` / `-rd`: Show commits between tags
 - `--release-last` / `-rl`: Show commits since last tag
 - `--release-prepare` / `-rp`: Prepare release documentation
+- `--release-deploy`: Create git tag for current version
+- `-m "message"`: Specify release message for annotated git tag
 - `--help` / `-h`: Display help information
 
 ### Version Manager
@@ -138,6 +140,12 @@ class GitManager:
         
     def is_git_repository(self) -> bool:
         """Check if current directory is a git repository"""
+        
+    def create_git_tag(self, tag_name: str, message: str = None) -> bool:
+        """Create a git tag with optional annotated message"""
+        
+    def tag_exists(self, tag_name: str) -> bool:
+        """Check if a git tag already exists"""
 ```
 
 ### Configuration System
