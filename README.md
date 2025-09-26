@@ -1,6 +1,6 @@
 # v-and-r (Version and Release Manager)
 
-- Version v2.0.2
+- Version v0.0.0
 
 A command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 

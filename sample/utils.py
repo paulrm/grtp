@@ -2,8 +2,8 @@
 Utility functions for sample application.
 """
 
-# Version: v1.3.0
-version = "v2.0.2"
+# Version: v0.0.0
+version = "v0.0.0"
 
 def get_version():
     """Return the current version"""

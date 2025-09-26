@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 Sample application file for testing v-and-r version management.
-- Version v1.2.3
+- Version v0.0.0
 """
 
 # Version: v1.2.3
-version = "v2.0.2"
+version = "v0.0.0"
 
 def main():
     """Main application entry point"""
