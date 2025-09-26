@@ -448,7 +448,10 @@ Use glob patterns for recursive directory scanning:
 
 ## Roadmap
 - [x] Issue: missing `--release-deploy` execute the git tag v1.0.0 -m "Release Name"
-- [ ] Issue: missing `-rd TAG` get the last commits from TAG to HEAD
+- [x] Issue: missing `-rd TAG` get the last commits from TAG to HEAD
+- [ ] Add Next version in --view with -p or -mi or -ma (use -p as default)
+- [ ] Add --release-prepare  with -p or -mi or -ma and use Next version (use -p as default)
+- [ ] Make commit before tag
 - [ ] Add Release Name generator for major and minor releases
 - [ ] Add support for pre-release and build metadata (e.g., v1.0.0-alpha, v1.0.0+build.1)
 - [ ] Add `--dry-run` flag for testing changes without applying them
