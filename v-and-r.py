@@ -1006,9 +1006,12 @@ class CLIInterface:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  v-and-r                    # View current versions (default)
-  v-and-r -v                 # View current versions
-  v-and-r --view             # View current versions
+  v-and-r                    # View current versions with next patch version (default)
+  v-and-r -v                 # View current versions with next patch version
+  v-and-r --view             # View current versions with next patch version
+  v-and-r -v -p              # View current versions with next patch version
+  v-and-r -v -mi             # View current versions with next minor version
+  v-and-r -v -ma             # View current versions with next major version
   v-and-r -p                 # Increment patch version
   v-and-r --patch            # Increment patch version
   v-and-r -mi                # Increment minor version
@@ -1035,7 +1038,7 @@ Configuration:
             """
         )
         
-        # Create mutually exclusive group for main commands
+        # Create mutually exclusive group for main commands (excluding increment commands)
         command_group = parser.add_mutually_exclusive_group()
         
         # View command (default)
@@ -1045,23 +1048,23 @@ Configuration:
             help='View current versions across all configured files (default behavior)'
         )
         
-        # Version increment commands
-        command_group.add_argument(
+        # Version increment commands (not in mutually exclusive group to allow combination with --view)
+        parser.add_argument(
             '-p', '--patch',
             action='store_true',
-            help='Increment patch version (e.g., v1.2.3 -> v1.2.4)'
+            help='Increment patch version (e.g., v1.2.3 -> v1.2.4) or show next patch version with --view'
         )
         
-        command_group.add_argument(
+        parser.add_argument(
             '-mi', '--minor',
             action='store_true',
-            help='Increment minor version and reset patch (e.g., v1.2.3 -> v1.3.0)'
+            help='Increment minor version and reset patch (e.g., v1.2.3 -> v1.3.0) or show next minor version with --view'
         )
         
-        command_group.add_argument(
+        parser.add_argument(
             '-ma', '--major',
             action='store_true',
-            help='Increment major version and reset minor/patch (e.g., v1.2.3 -> v2.0.0)'
+            help='Increment major version and reset minor/patch (e.g., v1.2.3 -> v2.0.0) or show next major version with --view'
         )
         
         # Release management commands
@@ -1153,6 +1156,16 @@ Configuration:
             print("Error: -m/--message option can only be used with --release-deploy")
             sys.exit(1)
         
+        # Validate increment flag combinations
+        increment_flags = [args.patch, args.minor, args.major]
+        increment_count = sum(increment_flags)
+        
+        if increment_count > 1:
+            print("Error: Only one increment type (-p, -mi, -ma) can be specified at a time")
+            sys.exit(1)
+        
+        # If increment flags are used with view, that's allowed for preview
+        # If increment flags are used without view, they perform actual increment
         # If no command specified, default to view
         if not any([
             args.view, args.patch, args.minor, args.major,
@@ -1173,14 +1186,21 @@ Configuration:
         """
         logger = logging.getLogger('v-and-r')
         
+        # Determine increment type for view or action
+        increment_type = None
+        if args.patch:
+            increment_type = "patch"
+        elif args.minor:
+            increment_type = "minor"
+        elif args.major:
+            increment_type = "major"
+        
         # Log the command being executed
         command_name = "view"  # default
-        if args.patch:
-            command_name = "patch"
-        elif args.minor:
-            command_name = "minor"
-        elif args.major:
-            command_name = "major"
+        if args.view and increment_type:
+            command_name = f"view-next-{increment_type}"
+        elif increment_type and not args.view:
+            command_name = increment_type
         elif args.release_info:
             command_name = "release-info"
         elif args.release_diff:
@@ -1199,13 +1219,12 @@ Configuration:
         
         # Execute the appropriate command (error handling is done at higher level)
         if args.view:
-            return self._execute_view_command()
-        elif args.patch:
-            return self._execute_increment_command('patch')
-        elif args.minor:
-            return self._execute_increment_command('minor')
-        elif args.major:
-            return self._execute_increment_command('major')
+            # View command with next version preview (default to patch if no increment type specified)
+            next_version_type = increment_type if increment_type else "patch"
+            return self._execute_view_command(next_version_type)
+        elif increment_type and not args.view:
+            # Increment command (actual file modification)
+            return self._execute_increment_command(increment_type)
         elif args.release_info:
             return self._execute_release_info_command()
         elif args.release_diff:
@@ -1221,12 +1240,15 @@ Configuration:
             message = getattr(args, 'message', None)
             return self._execute_release_deploy_command(message)
         else:
-            # Default to view if no command specified
-            return self._execute_view_command()
+            # Default to view if no command specified (with default patch preview)
+            return self._execute_view_command("patch")
     
-    def _execute_view_command(self) -> int:
+    def _execute_view_command(self, next_version_type: Optional[str] = None) -> int:
         """
-        Execute view command to display current versions.
+        Execute view command to display current versions and optionally next version.
+        
+        Args:
+            next_version_type: Type of next version to show ('patch', 'minor', 'major'), or None
         
         Returns:
             Exit code (0 for success, 1 for failure)
@@ -1256,15 +1278,38 @@ Configuration:
             print(f"  {file_path}: {version}")
             logger.debug(f"Found version {version} in {file_path}")
         
-        # Highlight highest version if multiple versions exist
-        if len(versions_found) > 1:
-            try:
-                highest_version = self.version_manager.find_highest_version(list(versions_found.values()))
+        # Determine and display highest version
+        try:
+            highest_version = self.version_manager.find_highest_version(list(versions_found.values()))
+            if len(versions_found) > 1:
                 print(f"\nHighest version: {highest_version}")
-                logger.debug(f"Highest version determined: {highest_version}")
-            except VersionError as e:
-                print(f"\nWarning: Could not determine highest version: {e}")
-                logger.warning(f"Could not determine highest version: {e}")
+            
+            # Show next version if requested
+            if next_version_type:
+                try:
+                    if next_version_type == 'patch':
+                        next_version = self.version_manager.increment_patch(highest_version)
+                    elif next_version_type == 'minor':
+                        next_version = self.version_manager.increment_minor(highest_version)
+                    elif next_version_type == 'major':
+                        next_version = self.version_manager.increment_major(highest_version)
+                    else:
+                        # Default to patch if invalid type
+                        next_version = self.version_manager.increment_patch(highest_version)
+                        next_version_type = 'patch'
+                    
+                    print(f"Next {next_version_type} version: {next_version}")
+                    logger.debug(f"Next {next_version_type} version calculated: {next_version}")
+                    
+                except VersionError as e:
+                    print(f"\nWarning: Could not calculate next {next_version_type} version: {e}")
+                    logger.warning(f"Could not calculate next {next_version_type} version: {e}")
+            
+            logger.debug(f"Highest version determined: {highest_version}")
+            
+        except VersionError as e:
+            print(f"\nWarning: Could not determine highest version: {e}")
+            logger.warning(f"Could not determine highest version: {e}")
         
         logger.info("View command completed successfully")
         return 0

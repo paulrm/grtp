@@ -1,6 +1,6 @@
 # v-and-r (Version and Release Manager)
 
-- Version v0.1.1
+- Version v0.2.0
 
 A command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 
@@ -30,11 +30,17 @@ ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
 
 ## Quick Start
 
-1. **View current versions** (default behavior):
+1. **View current versions with next patch version** (default behavior):
    ```bash
    python v-and-r.py
    # or
    python v-and-r.py --view
+   
+   # Show next minor version instead
+   python v-and-r.py --view --minor
+   
+   # Show next major version instead  
+   python v-and-r.py --view --major
    ```
 
 2. **Increment patch version** (e.g., v1.2.3 → v1.2.4):
@@ -52,11 +58,16 @@ ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
    python v-and-r.py --release-info
    ```
 
+> **Note:** The `--view` command now shows the next version by default. You can combine `--view` with increment flags (`-p`, `-mi`, `-ma`) to preview what the next version would be without actually modifying any files. When increment flags are used without `--view`, they perform the actual version increment.
+
 ## Command Reference
 
 | Command | Short | Description |
 |---------|-------|-------------|
-| `--view` | `-v` | Show current versions across all configured files (default) |
+| `--view` | `-v` | Show current versions across all configured files with next patch version (default) |
+| `--view --patch` | `-v -p` | Show current versions with next patch version |
+| `--view --minor` | `-v -mi` | Show current versions with next minor version |
+| `--view --major` | `-v -ma` | Show current versions with next major version |
 | `--patch` | `-p` | Increment patch version (bug fixes) |
 | `--minor` | `-mi` | Increment minor version (new features) |
 | `--major` | `-ma` | Increment major version (breaking changes) |
