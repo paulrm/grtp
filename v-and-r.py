@@ -1020,7 +1020,7 @@ Configuration:
     
     def _execute_increment_command(self, increment_type: str) -> int:
         """
-        Execute version increment command.
+        Execute version increment command with rollback mechanism and confirmation.
         
         Args:
             increment_type: Type of increment ('patch', 'minor', 'major')
@@ -1037,7 +1037,16 @@ Configuration:
             
             if not versions_found:
                 print("Error: No versions found in configured files.")
+                print("\nConfigured file patterns:")
+                for config in self.file_manager.file_configs:
+                    print(f"  - {config.file_pattern}")
                 return 1
+            
+            # Display current versions
+            print("Current versions found:")
+            for file_path, version in versions_found.items():
+                print(f"  {file_path}: {version}")
+            print()
             
             # Find highest version
             current_version = self.version_manager.find_highest_version(list(versions_found.values()))
@@ -1053,31 +1062,140 @@ Configuration:
             else:
                 raise ValueError(f"Invalid increment type: {increment_type}")
             
-            print(f"New version: {new_version}")
+            print(f"New version will be: {new_version}")
             print()
             
-            # Update all files
-            print("Updating files...")
-            update_results = self.file_manager.update_all_files(new_version)
-            
-            success_count = 0
-            for file_path, success in update_results.items():
-                status = "✓" if success else "✗"
-                print(f"  {status} {file_path}")
-                if success:
-                    success_count += 1
-            
-            print()
-            if success_count == len(update_results):
-                print(f"Successfully updated {success_count} files to version {new_version}")
+            # Get confirmation from user
+            try:
+                confirmation = input(f"Proceed with {increment_type} version increment to {new_version}? (y/N): ").strip().lower()
+                if confirmation not in ['y', 'yes']:
+                    print("Operation cancelled by user.")
+                    return 0
+            except (EOFError, KeyboardInterrupt):
+                print("\nOperation cancelled by user.")
                 return 0
+            
+            print()
+            print("Updating files...")
+            
+            # Store original file contents for rollback
+            original_contents = {}
+            files_to_update = self.file_manager.expand_file_patterns()
+            
+            # Read original contents before making changes
+            for file_path in files_to_update:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        original_contents[file_path] = f.read()
+                except (IOError, UnicodeDecodeError) as e:
+                    print(f"Warning: Could not read {file_path} for backup: {e}")
+            
+            # Update all files with rollback capability
+            update_results = {}
+            failed_files = []
+            
+            for file_path in files_to_update:
+                try:
+                    success = self.file_manager.update_file_version(file_path, new_version)
+                    update_results[file_path] = success
+                    
+                    status = "✓" if success else "○"
+                    status_text = "updated" if success else "no version found"
+                    print(f"  {status} {file_path} - {status_text}")
+                    
+                    if not success:
+                        # File had no version to update - this is not necessarily an error
+                        continue
+                        
+                except FileError as e:
+                    update_results[file_path] = False
+                    failed_files.append((file_path, str(e)))
+                    print(f"  ✗ {file_path} - failed: {e}")
+            
+            print()
+            
+            # Check if any critical failures occurred
+            if failed_files:
+                print(f"Warning: {len(failed_files)} files failed to update:")
+                for file_path, error in failed_files:
+                    print(f"  - {file_path}: {error}")
+                print()
+                
+                # Ask if user wants to rollback
+                try:
+                    rollback_choice = input("Some files failed to update. Rollback all changes? (y/N): ").strip().lower()
+                    if rollback_choice in ['y', 'yes']:
+                        print("Rolling back changes...")
+                        self._rollback_file_changes(original_contents, update_results)
+                        print("All changes have been rolled back.")
+                        return 1
+                except (EOFError, KeyboardInterrupt):
+                    print("\nNo rollback performed.")
+            
+            # Count successful updates
+            successful_updates = sum(1 for success in update_results.values() if success)
+            total_files = len(update_results)
+            files_with_versions = sum(1 for file_path in files_to_update 
+                                    if file_path in versions_found or 
+                                    update_results.get(file_path, False))
+            
+            # Report results
+            if successful_updates > 0:
+                print(f"✓ Successfully updated {successful_updates} files to version {new_version}")
+                if failed_files:
+                    print(f"  Note: {len(failed_files)} files had errors but changes were not rolled back")
+                
+                # Show summary of what was updated
+                print("\nSummary:")
+                print(f"  - Files processed: {total_files}")
+                print(f"  - Files updated: {successful_updates}")
+                print(f"  - Files with errors: {len(failed_files)}")
+                print(f"  - Files without versions: {total_files - files_with_versions}")
+                
+                return 0 if not failed_files else 1
             else:
-                print(f"Updated {success_count}/{len(update_results)} files. Some updates failed.")
+                print("✗ No files were successfully updated.")
+                if original_contents:
+                    print("Rolling back any partial changes...")
+                    self._rollback_file_changes(original_contents, update_results)
                 return 1
                 
         except (VersionError, FileError) as e:
             print(f"Error: {e}")
             return 1
+        except Exception as e:
+            print(f"Unexpected error during version increment: {e}")
+            return 1
+    
+    def _rollback_file_changes(self, original_contents: Dict[str, str], update_results: Dict[str, bool]) -> None:
+        """
+        Rollback file changes using stored original contents.
+        
+        Args:
+            original_contents: Dictionary mapping file paths to their original content
+            update_results: Dictionary mapping file paths to update success status
+        """
+        rollback_count = 0
+        rollback_errors = []
+        
+        for file_path, original_content in original_contents.items():
+            # Only rollback files that were successfully updated
+            if update_results.get(file_path, False):
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(original_content)
+                    rollback_count += 1
+                    print(f"  ✓ Rolled back {file_path}")
+                except (IOError, UnicodeDecodeError) as e:
+                    rollback_errors.append((file_path, str(e)))
+                    print(f"  ✗ Failed to rollback {file_path}: {e}")
+        
+        if rollback_errors:
+            print(f"\nWarning: {len(rollback_errors)} files could not be rolled back:")
+            for file_path, error in rollback_errors:
+                print(f"  - {file_path}: {error}")
+        else:
+            print(f"\nSuccessfully rolled back {rollback_count} files.")
     
     def _execute_release_info_command(self) -> int:
         """
@@ -1297,19 +1415,32 @@ def test_cli_interface():
     def test_execute_increment_command():
         cli = CLIInterface()
         
-        # Mock successful increment
+        # Mock successful increment with user confirmation
         mock_versions = {'app.py': 'v1.2.3'}
-        mock_update_results = {'app.py': True}
+        mock_expanded_files = ['app.py']
         
         with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
-            with mock.patch.object(cli.file_manager, 'update_all_files', return_value=mock_update_results):
+            with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
+                with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
+                    with mock.patch('builtins.input', return_value='y'):  # User confirms
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                                result = cli._execute_increment_command('patch')
+                                assert result == 0
+                                output = mock_stdout.getvalue()
+                                assert 'v1.2.3' in output
+                                assert 'v1.2.4' in output
+                                assert '✓ app.py' in output
+                                assert 'Successfully updated' in output
+        
+        # Test user cancellation
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch('builtins.input', return_value='n'):  # User cancels
                 with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                     result = cli._execute_increment_command('patch')
                     assert result == 0
                     output = mock_stdout.getvalue()
-                    assert 'v1.2.3' in output
-                    assert 'v1.2.4' in output
-                    assert '✓ app.py' in output
+                    assert 'Operation cancelled' in output
         
         # Test no versions found
         with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value={}):
@@ -1319,16 +1450,107 @@ def test_cli_interface():
                 output = mock_stdout.getvalue()
                 assert 'No versions found' in output
         
-        # Test partial update failure
-        mock_update_results_partial = {'app.py': True, 'README.md': False}
+        # Test file update failure with rollback
         with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
-            with mock.patch.object(cli.file_manager, 'update_all_files', return_value=mock_update_results_partial):
+            with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
+                with mock.patch.object(cli.file_manager, 'update_file_version', side_effect=FileError("Write failed")):
+                    with mock.patch('builtins.input', side_effect=['y', 'y']):  # Confirm update, then rollback
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                                result = cli._execute_increment_command('minor')
+                                assert result == 1
+                                output = mock_stdout.getvalue()
+                                assert 'failed' in output
+                                assert 'Rolling back' in output
+        
+        # Test KeyboardInterrupt during confirmation
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch('builtins.input', side_effect=KeyboardInterrupt()):
                 with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
-                    result = cli._execute_increment_command('minor')
-                    assert result == 1
+                    result = cli._execute_increment_command('major')
+                    assert result == 0
                     output = mock_stdout.getvalue()
-                    assert 'v1.3.0' in output
-                    assert 'Some updates failed' in output
+                    assert 'Operation cancelled' in output
+    
+    def test_rollback_mechanism():
+        cli = CLIInterface()
+        
+        # Test successful rollback
+        original_contents = {
+            'app.py': 'version = "v1.2.3"',
+            'config.py': 'VERSION = "v1.2.3"'
+        }
+        update_results = {
+            'app.py': True,
+            'config.py': True
+        }
+        
+        with mock.patch('builtins.open', mock.mock_open()) as mock_file:
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                cli._rollback_file_changes(original_contents, update_results)
+                output = mock_stdout.getvalue()
+                assert 'Rolled back app.py' in output
+                assert 'Rolled back config.py' in output
+                assert 'Successfully rolled back 2 files' in output
+        
+        # Test rollback with some failures
+        with mock.patch('builtins.open', side_effect=[IOError("Permission denied"), mock.mock_open().return_value]):
+            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                cli._rollback_file_changes(original_contents, update_results)
+                output = mock_stdout.getvalue()
+                assert 'Failed to rollback app.py' in output
+                assert 'Rolled back config.py' in output
+                assert 'could not be rolled back' in output
+    
+    def test_increment_integration():
+        """Integration test for complete increment workflow"""
+        cli = CLIInterface()
+        
+        # Test patch increment integration
+        mock_versions = {'test.py': 'v1.2.3', 'config.py': 'v1.2.2'}
+        mock_expanded_files = ['test.py', 'config.py']
+        
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
+                with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
+                    with mock.patch('builtins.input', return_value='yes'):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                                result = cli._execute_increment_command('patch')
+                                assert result == 0
+                                output = mock_stdout.getvalue()
+                                # Should find highest version v1.2.3 and increment to v1.2.4
+                                assert 'v1.2.3' in output
+                                assert 'v1.2.4' in output
+                                assert 'Successfully updated 2 files' in output
+        
+        # Test minor increment integration
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
+                with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
+                    with mock.patch('builtins.input', return_value='y'):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                                result = cli._execute_increment_command('minor')
+                                assert result == 0
+                                output = mock_stdout.getvalue()
+                                # Should find highest version v1.2.3 and increment to v1.3.0
+                                assert 'v1.2.3' in output
+                                assert 'v1.3.0' in output
+        
+        # Test major increment integration
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
+                with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
+                    with mock.patch('builtins.input', return_value='y'):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                            with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+                                result = cli._execute_increment_command('major')
+                                assert result == 0
+                                output = mock_stdout.getvalue()
+                                # Should find highest version v1.2.3 and increment to v2.0.0
+                                assert 'v1.2.3' in output
+                                assert 'v2.0.0' in output
     
     def test_execute_command_routing():
         cli = CLIInterface()
@@ -1419,6 +1641,8 @@ def test_cli_interface():
         ("argument_validation", test_argument_validation),
         ("execute_view_command", test_execute_view_command),
         ("execute_increment_command", test_execute_increment_command),
+        ("rollback_mechanism", test_rollback_mechanism),
+        ("increment_integration", test_increment_integration),
         ("execute_command_routing", test_execute_command_routing),
         ("placeholder_commands", test_placeholder_commands),
     ]
