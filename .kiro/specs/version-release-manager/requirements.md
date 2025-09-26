@@ -134,3 +134,17 @@ all configured files are defined in VERSION_FILES
 2. WHEN git tags are used THEN the system SHALL correctly parse and compare tag versions
 3. WHEN git commits are analyzed THEN the system SHALL provide meaningful commit history information
 4. WHEN git is not available THEN the system SHALL gracefully handle the absence of git integration
+
+### Requirement 13
+
+**User Story:** As a developer, I want to deploy releases with git tags, so that I can create tagged releases with custom release names.
+
+#### Acceptance Criteria
+
+1. WHEN the user runs `v-and-r --release-deploy` THEN the system SHALL create a git tag with the current highest version
+2. WHEN the user runs `v-and-r --release-deploy -m "Release Name"` THEN the system SHALL create an annotated git tag with the specified release name as the tag message
+3. WHEN creating a git tag THEN the system SHALL use the current highest version found across all configured files as the tag name
+4. WHEN the git tag is created successfully THEN the system SHALL display confirmation with the tag name and message
+5. WHEN git tag creation fails THEN the system SHALL display an appropriate error message
+6. WHEN no git repository is available THEN the system SHALL display an error indicating git is required for release deployment
+7. WHEN the tag already exists THEN the system SHALL display an error and not overwrite the existing tag
