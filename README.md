@@ -62,6 +62,7 @@ ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
 > - Current versions across all configured files
 > - Next version preview (patch by default, or specify `-mi`/`-ma` for minor/major)
 > - Last git tag and commits since that tag (when in a git repository)
+> - Working directory status: staged files, modified files, and untracked files
 > - Contributor information and commit statistics
 > 
 > You can combine `--view` with increment flags (`-p`, `-mi`, `-ma`) to preview what the next version would be without actually modifying any files. When increment flags are used without `--view`, they perform the actual version increment.
@@ -70,7 +71,7 @@ ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
 
 | Command | Short | Description |
 |---------|-------|-------------|
-| `--view` | `-v` | Show current versions, next patch version, last git tag, and recent commits (default) |
+| `--view` | `-v` | Show current versions, next patch version, git history, and working directory status (default) |
 | `--view --patch` | `-v -p` | Show current versions with next patch version and git info |
 | `--view --minor` | `-v -mi` | Show current versions with next minor version and git info |
 | `--view --major` | `-v -ma` | Show current versions with next major version and git info |
@@ -206,6 +207,13 @@ python v-and-r.py --view
 # def5678  Update documentation  
 # ghi9012  Refactor user management
 # Total commits since v1.2.0: 3
+#
+# Working Directory Status:
+# Changes not staged for commit:
+#   modified:   src/app.py
+# Untracked files:
+#   new-feature.py
+# Summary: 1 changed file, 1 untracked file
 
 # Increment patch version for bug fix
 python v-and-r.py --patch
@@ -480,6 +488,7 @@ Use glob patterns for recursive directory scanning:
 - [ ] Add --release-prepare  with -p or -mi or -ma and use Next version (use -p as default)
 - [ ] Make commit before tag
 - [ ] Move documentation to /docs dir
+- [ ] Change test message 'Some tests failed! ✗' for 'Tests failed: none 😀'
 - [ ] Add usefull commands
     - custom list of commits
     - custom list of tags
