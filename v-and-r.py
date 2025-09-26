@@ -954,7 +954,30 @@ VERSION_FILES = [
         'pattern': re.compile(r'- Version (v\d+\.\d+\.\d+)'),
         'template': '- Version {version}',
     },
-    
+    {
+        'file': 'chrome-extension/popup.js',
+        'pattern': re.compile(r'const VERSION = "(v\d+\.\d+\.\d+)"'),
+        'template': 'const VERSION = "{version}"'
+    },
+    #   "version": "1.6.20", (manifest.json)
+    {
+        'file': 'chrome-extension/manifest.json',
+        'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
+        'template': '"version": "{version}"',
+    },
+    {
+        # const VERSION = '1.6.16';
+        'file': 'api.php',
+        'pattern': re.compile(r"const VERSION = \"(v\d+\.\d+\.\d+)\""),
+        'template': "const VERSION = \"{version}\""
+    },
+    # Comment in PHP
+    # {
+    #     # * @version 1.6.16
+    #     'file': 'api.php',
+    #     'pattern': re.compile(r" \* @version (v\d+\.\d+\.\d+)"),
+    #     'template': '* @version {version};'    
+    # },
     # Python files with version variable (quoted)
     {
         'file': 'sample/*.py',
