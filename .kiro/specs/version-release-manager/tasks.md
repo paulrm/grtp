@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Set up project structure and core data models
+- [x] 1. Set up project structure and core data models
   - Create the main v-and-r.py file with basic structure
   - Implement Version dataclass with comparison methods and string representation
   - Implement FileConfig dataclass for configuration entries
