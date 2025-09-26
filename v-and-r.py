@@ -14,6 +14,7 @@ import subprocess
 import glob
 import os
 import sys
+import datetime
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
@@ -1197,6 +1198,150 @@ Configuration:
         else:
             print(f"\nSuccessfully rolled back {rollback_count} files.")
     
+    def generate_release_info(self) -> ReleaseInfo:
+        """
+        Generate release information with git integration and graceful degradation.
+        
+        Returns:
+            ReleaseInfo object with version, timestamp, commit hash, and commits
+            
+        Raises:
+            VAndRError: If unable to determine current version or generate release info
+        """
+        import datetime
+        
+        # Get current version from files
+        try:
+            versions_found = self.file_manager.find_versions_in_files()
+            if not versions_found:
+                raise VAndRError("No versions found in configured files")
+            
+            current_version = self.version_manager.find_highest_version(list(versions_found.values()))
+        except (FileError, VersionError) as e:
+            raise VAndRError(f"Cannot determine current version: {e}")
+        
+        # Generate timestamp
+        timestamp = datetime.datetime.now().isoformat()
+        
+        # Initialize git-related variables with defaults
+        commit_hash = "unknown"
+        commits = []
+        previous_version = None
+        
+        # Try to get git information with graceful degradation
+        if self.git_manager.is_git_repository():
+            try:
+                # Get current commit hash
+                commit_hash = self.git_manager.get_current_commit_hash()
+                
+                # Try to get previous version from git tags
+                try:
+                    tags = self.git_manager.get_git_tags()
+                    if tags:
+                        # Find the previous version tag (not the current one)
+                        for tag in tags:
+                            if tag != current_version:
+                                previous_version = tag
+                                break
+                        
+                        # Get commits since previous version or all commits if no previous version
+                        if previous_version:
+                            commits = self.git_manager.get_commits_since_tag(previous_version)
+                        else:
+                            # No previous version, get all commits
+                            commits = self.git_manager.get_all_commits_since_beginning()
+                    else:
+                        # No tags exist, get all commits
+                        commits = self.git_manager.get_all_commits_since_beginning()
+                        
+                except GitError as e:
+                    # Git tag operations failed, but we can still get basic info
+                    print(f"Warning: Could not retrieve git tag information: {e}")
+                    try:
+                        # Fallback to getting all commits
+                        commits = self.git_manager.get_all_commits_since_beginning()
+                    except GitError:
+                        # Even basic git operations failed
+                        print("Warning: Could not retrieve commit history")
+                        commits = []
+                        
+            except GitError as e:
+                # Git operations failed, use defaults
+                print(f"Warning: Git integration failed: {e}")
+                commit_hash = "unknown"
+                commits = []
+        else:
+            print("Warning: Not in a git repository - using basic release info")
+        
+        return ReleaseInfo(
+            version=current_version,
+            timestamp=timestamp,
+            commit_hash=commit_hash,
+            commits=commits,
+            previous_version=previous_version
+        )
+    
+    def _format_release_notes(self, commits: List[Dict]) -> None:
+        """
+        Format and display release notes based on commit messages.
+        
+        Args:
+            commits: List of commit dictionaries with hash, message, author, and date
+        """
+        if not commits:
+            print("No commits to display.")
+            return
+        
+        # Group commits by type if they follow conventional commit format
+        commit_groups = {
+            'Features': [],
+            'Bug Fixes': [],
+            'Documentation': [],
+            'Other': []
+        }
+        
+        for commit in commits:
+            message = commit['message'].strip()
+            hash_short = commit['hash'][:7] if len(commit['hash']) >= 7 else commit['hash']
+            
+            # Categorize commits based on conventional commit prefixes
+            if message.lower().startswith(('feat:', 'feature:')):
+                commit_groups['Features'].append(f"  - {message} ({hash_short})")
+            elif message.lower().startswith(('fix:', 'bugfix:')):
+                commit_groups['Bug Fixes'].append(f"  - {message} ({hash_short})")
+            elif message.lower().startswith(('docs:', 'doc:')):
+                commit_groups['Documentation'].append(f"  - {message} ({hash_short})")
+            else:
+                commit_groups['Other'].append(f"  - {message} ({hash_short})")
+        
+        # Display grouped commits
+        for group_name, group_commits in commit_groups.items():
+            if group_commits:
+                print(f"\n{group_name}:")
+                for commit_line in group_commits[:10]:  # Limit to 10 commits per group
+                    print(commit_line)
+                
+                if len(group_commits) > 10:
+                    print(f"  ... and {len(group_commits) - 10} more commits")
+        
+        # Show total commit count
+        print(f"\nTotal commits: {len(commits)}")
+        
+        # Show date range if available
+        if commits:
+            try:
+                dates = [commit['date'] for commit in commits if commit.get('date')]
+                if dates:
+                    # Sort dates to get range
+                    sorted_dates = sorted(dates)
+                    if len(sorted_dates) > 1:
+                        print(f"Date range: {sorted_dates[-1][:10]} to {sorted_dates[0][:10]}")
+                    else:
+                        print(f"Date: {sorted_dates[0][:10]}")
+            except (KeyError, IndexError, TypeError):
+                # Date parsing failed, skip date range
+                pass
+    
     def _execute_release_info_command(self) -> int:
         """
         Execute release info command to generate version.json.
@@ -1207,9 +1352,40 @@ Configuration:
         print("v-and-r: Generating release information")
         print("=" * 50)
         
-        # This is a placeholder - full implementation will be in task 8
-        print("Release info generation - implementation pending")
-        return 0
+        try:
+            release_info = self.generate_release_info()
+            
+            # Write version.json file
+            version_json_path = 'version.json'
+            with open(version_json_path, 'w', encoding='utf-8') as f:
+                f.write(release_info.to_json())
+            
+            print(f"✓ Generated {version_json_path}")
+            print(f"  Version: {release_info.version}")
+            print(f"  Timestamp: {release_info.timestamp}")
+            print(f"  Commit: {release_info.commit_hash}")
+            
+            if release_info.previous_version:
+                print(f"  Previous version: {release_info.previous_version}")
+            
+            print(f"  Commits included: {len(release_info.commits)}")
+            
+            # Display release notes
+            if release_info.commits:
+                print("\nRelease Notes:")
+                print("-" * 30)
+                self._format_release_notes(release_info.commits)
+            else:
+                print("\nNo commits found for release notes.")
+            
+            return 0
+            
+        except (VAndRError, VersionError, FileError, GitError) as e:
+            print(f"Error generating release info: {e}")
+            return 1
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            return 1
     
     def _execute_release_diff_command(self, tag1: str, tag2: str) -> int:
         """
@@ -1395,6 +1571,81 @@ def test_cli_interface():
                 output = mock_stdout.getvalue()
                 assert 'app.py: v1.2.3' in output
                 assert 'README.md: v1.2.3' in output
+    
+    def test_generate_release_info():
+        cli = CLIInterface()
+        
+        # Mock file manager to return versions
+        mock_versions = {'app.py': 'v1.2.3'}
+        
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+                with mock.patch.object(cli.git_manager, 'get_current_commit_hash', return_value='abc1234'):
+                    with mock.patch.object(cli.git_manager, 'get_git_tags', return_value=['v1.1.0', 'v1.0.0']):
+                        with mock.patch.object(cli.git_manager, 'get_commits_since_tag', return_value=[
+                            {'hash': 'abc1234', 'message': 'feat: add new feature', 'author': 'Test User', 'date': '2023-01-01'}
+                        ]):
+                            release_info = cli.generate_release_info()
+                            
+                            assert release_info.version == 'v1.2.3'
+                            assert release_info.commit_hash == 'abc1234'
+                            assert release_info.previous_version == 'v1.1.0'
+                            assert len(release_info.commits) == 1
+                            assert release_info.commits[0]['message'] == 'feat: add new feature'
+    
+    def test_generate_release_info_no_git():
+        cli = CLIInterface()
+        
+        # Mock file manager to return versions
+        mock_versions = {'app.py': 'v1.2.3'}
+        
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=False):
+                release_info = cli.generate_release_info()
+                
+                assert release_info.version == 'v1.2.3'
+                assert release_info.commit_hash == 'unknown'
+                assert release_info.previous_version is None
+                assert len(release_info.commits) == 0
+    
+    def test_generate_release_info_git_errors():
+        cli = CLIInterface()
+        
+        # Mock file manager to return versions
+        mock_versions = {'app.py': 'v1.2.3'}
+        
+        with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value=mock_versions):
+            with mock.patch.object(cli.git_manager, 'is_git_repository', return_value=True):
+                with mock.patch.object(cli.git_manager, 'get_current_commit_hash', side_effect=GitError("Git failed")):
+                    release_info = cli.generate_release_info()
+                    
+                    assert release_info.version == 'v1.2.3'
+                    assert release_info.commit_hash == 'unknown'
+                    assert len(release_info.commits) == 0
+    
+    def test_format_release_notes():
+        cli = CLIInterface()
+        
+        commits = [
+            {'hash': 'abc1234567', 'message': 'feat: add new feature', 'author': 'Test User', 'date': '2023-01-01'},
+            {'hash': 'def5678901', 'message': 'fix: resolve bug', 'author': 'Test User', 'date': '2023-01-02'},
+            {'hash': 'ghi2345678', 'message': 'docs: update readme', 'author': 'Test User', 'date': '2023-01-03'},
+            {'hash': 'jkl9012345', 'message': 'refactor: improve code', 'author': 'Test User', 'date': '2023-01-04'}
+        ]
+        
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            cli._format_release_notes(commits)
+            output = mock_stdout.getvalue()
+            
+            assert "Features:" in output
+            assert "feat: add new feature (abc1234)" in output
+            assert "Bug Fixes:" in output
+            assert "fix: resolve bug (def5678)" in output
+            assert "Documentation:" in output
+            assert "docs: update readme (ghi2345)" in output
+            assert "Other:" in output
+            assert "refactor: improve code (jkl9012)" in output
+            assert "Total commits: 4" in output
         
         # Test no versions found
         with mock.patch.object(cli.file_manager, 'find_versions_in_files', return_value={}):
@@ -1645,6 +1896,10 @@ def test_cli_interface():
         ("increment_integration", test_increment_integration),
         ("execute_command_routing", test_execute_command_routing),
         ("placeholder_commands", test_placeholder_commands),
+        ("generate_release_info", test_generate_release_info),
+        ("generate_release_info_no_git", test_generate_release_info_no_git),
+        ("generate_release_info_git_errors", test_generate_release_info_git_errors),
+        ("format_release_notes", test_format_release_notes),
     ]
     
     passed = 0

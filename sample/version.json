@@ -1,0 +1,80 @@
+{
+  "version": "v2.0.0",
+  "timestamp": "2025-09-26T02:27:02.146549",
+  "commit_hash": "55c6d7e",
+  "previous_version": null,
+  "commits": [
+    {
+      "hash": "55c6d7e2542498016a072928fd670e143fcbf239",
+      "message": "\ud83d\ude80 Task 7 / Implement version increment commands (patch, minor, major)",
+      "author": "paulrm",
+      "date": "2025-09-26 02:22:36 -0300"
+    },
+    {
+      "hash": "cea2e8c20d3075be5f26a820d3e360b66d41230c",
+      "message": "\ud83d\udcc2\u2705 Added new 'config.py' and 'utils.py' files, finished 'view command' implementation in version-release-manager, updated README and 'app.py' version display info",
+      "author": "paulrm",
+      "date": "2025-09-26 02:16:27 -0300"
+    },
+    {
+      "hash": "8b09695b3db630dd9b273d86775da6e12084b5cc",
+      "message": "\ud83d\udcc1 Added sample directory and files for testing in version-release-manager",
+      "author": "paulrm",
+      "date": "2025-09-26 02:10:25 -0300"
+    },
+    {
+      "hash": "5868329a2fe7105723ec205d9531ea473324da30",
+      "message": "\ud83d\ude80  Tasks 5 / Implement CLI interface and argument parsing",
+      "author": "paulrm",
+      "date": "2025-09-26 02:09:18 -0300"
+    },
+    {
+      "hash": "8a845ea0e7a47bd89f903552aa1623eecf23959b",
+      "message": "\ud83d\ude80 Task 4 / Implement GitManager class for git integration",
+      "author": "paulrm",
+      "date": "2025-09-26 02:02:12 -0300"
+    },
+    {
+      "hash": "14a1fbd8bafed229519751498149ad6935ce4d5c",
+      "message": "\ud83d\ude80 Task 3 /  Implement FileManager class for file operations and pattern matching",
+      "author": "paulrm",
+      "date": "2025-09-26 01:57:15 -0300"
+    },
+    {
+      "hash": "5416252a8727a88096e4d68aeb1d9e3d012ed7b1",
+      "message": "\ud83d\ude80 Implemented VersionManager class with semantic versioning logic and unit tests",
+      "author": "paulrm",
+      "date": "2025-09-26 01:51:12 -0300"
+    },
+    {
+      "hash": "ffde339a11bfab21af372508d4008c6c2eedf135",
+      "message": "\ud83d\udce6 Added '.gitignore' and 'v-and-r.py' files",
+      "author": "paulrm",
+      "date": "2025-09-26 01:48:06 -0300"
+    },
+    {
+      "hash": "9b8802bff3099e415fb2f7498efe371fb4f52caf",
+      "message": "\ud83d\udcdd Added new tasks documentation for version-release manager in specs",
+      "author": "paulrm",
+      "date": "2025-09-26 01:43:29 -0300"
+    },
+    {
+      "hash": "e7d98142981cabb839e1065c004e9864a62bddec",
+      "message": "\ud83d\udcdd Added design document for version release manager in kiro specs",
+      "author": "paulrm",
+      "date": "2025-09-26 01:41:28 -0300"
+    },
+    {
+      "hash": "de7a7798cbceb3e50ed84a5d7bfa0ed915f662b1",
+      "message": "\ud83d\udcdd\u2728 Added detailed description and sample for using CHANGELOG.md and RELEASES.md in product.md, also added requirements.md for version-release-manager",
+      "author": "paulrm",
+      "date": "2025-09-26 01:39:32 -0300"
+    },
+    {
+      "hash": "f68432cc23b0013ea1371ccc6b0b036907fcb2a6",
+      "message": "\ud83d\ude80 Initial commit",
+      "author": "paulrm",
+      "date": "2025-09-26 01:10:28 -0300"
+    }
+  ]
+}
