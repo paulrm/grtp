@@ -61,7 +61,7 @@ ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
 | `--minor` | `-mi` | Increment minor version (new features) |
 | `--major` | `-ma` | Increment major version (breaking changes) |
 | `--release-info` | `-r` | Generate version.json and display release notes |
-| `--release-diff tag1 tag2` | `-rd` | Show commits between two specific git tags |
+| `--release-diff tag1 [tag2]` | `-rd` | Show commits between two tags or from tag to HEAD |
 | `--release-last` | `-rl` | Show commits since the last git tag |
 | `--release-prepare` | `-rp` | Prepare release by updating version.json, CHANGELOG.md, and RELEASES.md |
 | `--help` | `-h` | Display help information and usage examples |
@@ -210,6 +210,10 @@ python v-and-r.py --release-info
 # Compare commits between two releases
 python v-and-r.py --release-diff v1.2.0 v1.3.0
 # Shows all commits between the specified tags
+
+# Show commits from a tag to current HEAD
+python v-and-r.py --release-diff v1.2.0
+# Shows all commits since the specified tag
 
 # Show commits since last release
 python v-and-r.py --release-last

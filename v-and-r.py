@@ -1019,6 +1019,8 @@ Examples:
   v-and-r --release-info     # Generate release information
   v-and-r -rd v1.0.0 v1.1.0  # Show commits between tags
   v-and-r --release-diff v1.0.0 v1.1.0  # Show commits between tags
+  v-and-r -rd v1.0.0         # Show commits from tag to HEAD
+  v-and-r --release-diff v1.0.0  # Show commits from tag to HEAD
   v-and-r -rl                # Show commits since last tag
   v-and-r --release-last     # Show commits since last tag
   v-and-r -rp                # Prepare release documentation
@@ -1071,9 +1073,9 @@ Configuration:
         
         command_group.add_argument(
             '-rd', '--release-diff',
-            nargs=2,
+            nargs='+',
             metavar=('TAG1', 'TAG2'),
-            help='Show commits between two git tags (TAG1 to TAG2)'
+            help='Show commits between two git tags (TAG1 to TAG2) or from TAG1 to HEAD'
         )
         
         command_group.add_argument(
@@ -1128,13 +1130,22 @@ Configuration:
         """
         # Check for release-diff argument validation
         if args.release_diff:
-            tag1, tag2 = args.release_diff
-            if not tag1 or not tag2:
-                print("Error: Both TAG1 and TAG2 must be provided for --release-diff")
-                sys.exit(1)
-            
-            if tag1 == tag2:
-                print("Error: TAG1 and TAG2 cannot be the same for --release-diff")
+            if len(args.release_diff) == 1:
+                tag1 = args.release_diff[0]
+                if not tag1:
+                    print("Error: TAG must be provided for --release-diff")
+                    sys.exit(1)
+            elif len(args.release_diff) == 2:
+                tag1, tag2 = args.release_diff
+                if not tag1 or not tag2:
+                    print("Error: Both TAG1 and TAG2 must be provided for --release-diff")
+                    sys.exit(1)
+                
+                if tag1 == tag2:
+                    print("Error: TAG1 and TAG2 cannot be the same for --release-diff")
+                    sys.exit(1)
+            else:
+                print("Error: --release-diff accepts 1 or 2 tags only")
                 sys.exit(1)
         
         # Validate message option usage
@@ -1173,7 +1184,10 @@ Configuration:
         elif args.release_info:
             command_name = "release-info"
         elif args.release_diff:
-            command_name = f"release-diff {args.release_diff[0]} {args.release_diff[1]}"
+            if len(args.release_diff) == 1:
+                command_name = f"release-diff {args.release_diff[0]} HEAD"
+            else:
+                command_name = f"release-diff {args.release_diff[0]} {args.release_diff[1]}"
         elif args.release_last:
             command_name = "release-last"
         elif args.release_prepare:
@@ -1195,7 +1209,10 @@ Configuration:
         elif args.release_info:
             return self._execute_release_info_command()
         elif args.release_diff:
-            return self._execute_release_diff_command(args.release_diff[0], args.release_diff[1])
+            if len(args.release_diff) == 1:
+                return self._execute_release_diff_command(args.release_diff[0], None)
+            else:
+                return self._execute_release_diff_command(args.release_diff[0], args.release_diff[1])
         elif args.release_last:
             return self._execute_release_last_command()
         elif args.release_prepare:
@@ -2080,18 +2097,21 @@ This document contains release notes and highlights for each version.
             print(f"Unexpected error: {e}")
             return 1
     
-    def _execute_release_diff_command(self, tag1: str, tag2: str) -> int:
+    def _execute_release_diff_command(self, tag1: str, tag2: Optional[str] = None) -> int:
         """
-        Execute release diff command to show commits between tags.
+        Execute release diff command to show commits between tags or from tag to HEAD.
         
         Args:
             tag1: Starting tag (older)
-            tag2: Ending tag (newer)
+            tag2: Ending tag (newer), or None to use HEAD
             
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        print(f"v-and-r: Commits between {tag1} and {tag2}")
+        if tag2 is None:
+            print(f"v-and-r: Commits from {tag1} to HEAD")
+        else:
+            print(f"v-and-r: Commits between {tag1} and {tag2}")
         print("=" * 50)
         
         try:
@@ -2101,12 +2121,12 @@ This document contains release notes and highlights for each version.
                 print("This command requires git integration to function.")
                 return 1
             
-            # Validate that both tags exist
+            # Validate that tag1 exists (and tag2 if provided)
             try:
                 # Get all available tags for reference
                 available_tags = self.git_manager.get_git_tags()
                 
-                # Check if tags exist
+                # Check if tag1 exists
                 if tag1 not in available_tags:
                     print(f"Error: Tag '{tag1}' does not exist")
                     if available_tags:
@@ -2117,7 +2137,8 @@ This document contains release notes and highlights for each version.
                         print("No git tags found in this repository")
                     return 1
                 
-                if tag2 not in available_tags:
+                # Check if tag2 exists (only if provided)
+                if tag2 is not None and tag2 not in available_tags:
                     print(f"Error: Tag '{tag2}' does not exist")
                     if available_tags:
                         print(f"Available tags: {', '.join(available_tags[:10])}")
@@ -2131,20 +2152,33 @@ This document contains release notes and highlights for each version.
                 print(f"Error retrieving git tags: {e}")
                 return 1
             
-            # Get commits between the tags
+            # Get commits between the tags or from tag to HEAD
             try:
-                commits = self.git_manager.get_commits_between_tags(tag1, tag2)
+                if tag2 is None:
+                    # Get commits from tag1 to HEAD (same as get_commits_since_tag)
+                    commits = self.git_manager.get_commits_since_tag(tag1)
+                    target_description = "HEAD"
+                else:
+                    # Get commits between two tags
+                    commits = self.git_manager.get_commits_between_tags(tag1, tag2)
+                    target_description = tag2
                 
                 if not commits:
-                    print(f"No commits found between {tag1} and {tag2}")
-                    print("This could mean:")
-                    print(f"  - The tags are the same commit")
-                    print(f"  - {tag2} is older than {tag1}")
-                    print(f"  - The tags are not in the current branch history")
+                    print(f"No commits found between {tag1} and {target_description}")
+                    if tag2 is None:
+                        print("This could mean:")
+                        print(f"  - HEAD is at the same commit as {tag1}")
+                        print(f"  - {tag1} is newer than HEAD")
+                        print(f"  - The tag is not in the current branch history")
+                    else:
+                        print("This could mean:")
+                        print(f"  - The tags are the same commit")
+                        print(f"  - {tag2} is older than {tag1}")
+                        print(f"  - The tags are not in the current branch history")
                     return 0
                 
                 # Display commit information
-                print(f"Found {len(commits)} commits between {tag1} and {tag2}:")
+                print(f"Found {len(commits)} commits between {tag1} and {target_description}:")
                 print()
                 
                 # Format and display commits
@@ -3249,6 +3283,12 @@ def test_cli_interface():
             release_prepare=False, release_deploy=False
         )
         
+        mock_args_release_diff_single = argparse.Namespace(
+            view=False, patch=False, minor=False, major=False,
+            release_info=False, release_diff=['v1.0.0'], release_last=False,
+            release_prepare=False, release_deploy=False
+        )
+        
         mock_args_release_last = argparse.Namespace(
             view=False, patch=False, minor=False, major=False,
             release_info=False, release_diff=None, release_last=True,
@@ -3273,11 +3313,17 @@ def test_cli_interface():
             assert result == 0
             mock_increment.assert_called_once_with('patch')
         
-        # Test release diff command routing
+        # Test release diff command routing (two tags)
         with mock.patch.object(cli, '_execute_release_diff_command', return_value=0) as mock_diff:
             result = cli.execute_command(mock_args_release_diff)
             assert result == 0
             mock_diff.assert_called_once_with('v1.0.0', 'v1.1.0')
+        
+        # Test release diff command routing (single tag to HEAD)
+        with mock.patch.object(cli, '_execute_release_diff_command', return_value=0) as mock_diff_single:
+            result = cli.execute_command(mock_args_release_diff_single)
+            assert result == 0
+            mock_diff_single.assert_called_once_with('v1.0.0', None)
         
         # Test release last command routing
         with mock.patch.object(cli, '_execute_release_last_command', return_value=0) as mock_last:
