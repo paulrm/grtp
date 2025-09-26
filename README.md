@@ -1,6 +1,6 @@
 # Version and Release
 
-- Version v2.0.0
+- Version v2.0.1
 
 create script python that helps to manage version and release of a project
 

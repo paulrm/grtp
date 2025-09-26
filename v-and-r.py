@@ -15,6 +15,7 @@ import glob
 import os
 import sys
 import datetime
+import logging
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
@@ -901,6 +902,13 @@ Configuration:
             help='Prepare release documentation (update version.json, CHANGELOG.md, RELEASES.md)'
         )
         
+        # Debug and utility flags (not mutually exclusive)
+        parser.add_argument(
+            '-d', '--debug',
+            action='store_true',
+            help='Enable debug logging for troubleshooting'
+        )
+        
         # Parse arguments
         args = parser.parse_args()
         
@@ -948,36 +956,47 @@ Configuration:
         Returns:
             Exit code (0 for success, non-zero for failure)
         """
-        try:
-            if args.view:
-                return self._execute_view_command()
-            elif args.patch:
-                return self._execute_increment_command('patch')
-            elif args.minor:
-                return self._execute_increment_command('minor')
-            elif args.major:
-                return self._execute_increment_command('major')
-            elif args.release_info:
-                return self._execute_release_info_command()
-            elif args.release_diff:
-                return self._execute_release_diff_command(args.release_diff[0], args.release_diff[1])
-            elif args.release_last:
-                return self._execute_release_last_command()
-            elif args.release_prepare:
-                return self._execute_release_prepare_command()
-            else:
-                # Default to view if no command specified
-                return self._execute_view_command()
-                
-        except (VAndRError, VersionError, FileError, GitError) as e:
-            print(f"Error: {e}")
-            return 1
-        except KeyboardInterrupt:
-            print("\nOperation cancelled by user")
-            return 130
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            return 1
+        logger = logging.getLogger('v-and-r')
+        
+        # Log the command being executed
+        command_name = "view"  # default
+        if args.patch:
+            command_name = "patch"
+        elif args.minor:
+            command_name = "minor"
+        elif args.major:
+            command_name = "major"
+        elif args.release_info:
+            command_name = "release-info"
+        elif args.release_diff:
+            command_name = f"release-diff {args.release_diff[0]} {args.release_diff[1]}"
+        elif args.release_last:
+            command_name = "release-last"
+        elif args.release_prepare:
+            command_name = "release-prepare"
+        
+        logger.info(f"Executing command: {command_name}")
+        
+        # Execute the appropriate command (error handling is done at higher level)
+        if args.view:
+            return self._execute_view_command()
+        elif args.patch:
+            return self._execute_increment_command('patch')
+        elif args.minor:
+            return self._execute_increment_command('minor')
+        elif args.major:
+            return self._execute_increment_command('major')
+        elif args.release_info:
+            return self._execute_release_info_command()
+        elif args.release_diff:
+            return self._execute_release_diff_command(args.release_diff[0], args.release_diff[1])
+        elif args.release_last:
+            return self._execute_release_last_command()
+        elif args.release_prepare:
+            return self._execute_release_prepare_command()
+        else:
+            # Default to view if no command specified
+            return self._execute_view_command()
     
     def _execute_view_command(self) -> int:
         """
@@ -986,38 +1005,43 @@ Configuration:
         Returns:
             Exit code (0 for success, 1 for failure)
         """
+        logger = logging.getLogger('v-and-r')
+        logger.debug("Executing view command")
+        
         print("v-and-r (Version and Release Manager)")
         print("=" * 50)
         print("Current versions across configured files:")
         print()
         
-        try:
-            versions_found = self.file_manager.find_versions_in_files()
-            
-            if not versions_found:
-                print("No versions found in any configured files.")
-                print("\nConfigured file patterns:")
-                for config in self.file_manager.file_configs:
-                    print(f"  - {config.file_pattern}")
-                return 0
-            
-            # Display found versions
-            for file_path, version in versions_found.items():
-                print(f"  {file_path}: {version}")
-            
-            # Highlight highest version if multiple versions exist
-            if len(versions_found) > 1:
-                try:
-                    highest_version = self.version_manager.find_highest_version(list(versions_found.values()))
-                    print(f"\nHighest version: {highest_version}")
-                except VersionError as e:
-                    print(f"\nWarning: Could not determine highest version: {e}")
-            
+        logger.debug("Scanning files for versions")
+        versions_found = self.file_manager.find_versions_in_files()
+        logger.debug(f"Found versions in {len(versions_found)} files")
+        
+        if not versions_found:
+            logger.info("No versions found in any configured files")
+            print("No versions found in any configured files.")
+            print("\nConfigured file patterns:")
+            for config in self.file_manager.file_configs:
+                print(f"  - {config.file_pattern}")
             return 0
-            
-        except FileError as e:
-            print(f"File error: {e}")
-            return 1
+        
+        # Display found versions
+        for file_path, version in versions_found.items():
+            print(f"  {file_path}: {version}")
+            logger.debug(f"Found version {version} in {file_path}")
+        
+        # Highlight highest version if multiple versions exist
+        if len(versions_found) > 1:
+            try:
+                highest_version = self.version_manager.find_highest_version(list(versions_found.values()))
+                print(f"\nHighest version: {highest_version}")
+                logger.debug(f"Highest version determined: {highest_version}")
+            except VersionError as e:
+                print(f"\nWarning: Could not determine highest version: {e}")
+                logger.warning(f"Could not determine highest version: {e}")
+        
+        logger.info("View command completed successfully")
+        return 0
     
     def _execute_increment_command(self, increment_type: str) -> int:
         """
@@ -2045,12 +2069,333 @@ This document contains release notes and highlights for each version.
             return 1
 
 
+def setup_logging(debug: bool = False) -> None:
+    """
+    Set up logging configuration for debugging and troubleshooting.
+    
+    Args:
+        debug: Enable debug level logging if True
+    """
+    log_level = logging.DEBUG if debug else logging.INFO
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=log_level,
+        format=log_format,
+        handlers=[
+            logging.StreamHandler(sys.stderr)
+        ]
+    )
+    
+    # Create logger for v-and-r
+    logger = logging.getLogger('v-and-r')
+    logger.setLevel(log_level)
+    
+    if debug:
+        logger.debug("Debug logging enabled")
+
+
+def validate_version_files_config(config: List[Dict]) -> None:
+    """
+    Validate VERSION_FILES configuration for completeness and correctness.
+    
+    Args:
+        config: VERSION_FILES configuration list
+        
+    Raises:
+        VAndRError: If configuration is invalid
+    """
+    logger = logging.getLogger('v-and-r')
+    logger.debug("Validating VERSION_FILES configuration")
+    
+    if not config:
+        raise VAndRError("VERSION_FILES configuration is empty. Please define at least one file pattern.")
+    
+    if not isinstance(config, list):
+        raise VAndRError("VERSION_FILES must be a list of configuration dictionaries.")
+    
+    required_keys = ['file', 'pattern', 'template']
+    
+    for i, entry in enumerate(config):
+        if not isinstance(entry, dict):
+            raise VAndRError(f"VERSION_FILES entry {i} must be a dictionary, got {type(entry)}")
+        
+        # Check required keys
+        for key in required_keys:
+            if key not in entry:
+                raise VAndRError(f"VERSION_FILES entry {i} missing required key: '{key}'")
+        
+        # Validate file pattern
+        if not isinstance(entry['file'], str) or not entry['file'].strip():
+            raise VAndRError(f"VERSION_FILES entry {i}: 'file' must be a non-empty string")
+        
+        # Validate regex pattern
+        if not isinstance(entry['pattern'], re.Pattern):
+            raise VAndRError(f"VERSION_FILES entry {i}: 'pattern' must be a compiled regex Pattern object")
+        
+        # Check that regex has at least one capture group
+        if entry['pattern'].groups < 1:
+            raise VAndRError(f"VERSION_FILES entry {i}: regex pattern must have at least one capture group to extract version")
+        
+        # Validate template
+        if not isinstance(entry['template'], str) or not entry['template'].strip():
+            raise VAndRError(f"VERSION_FILES entry {i}: 'template' must be a non-empty string")
+        
+        # Check that template contains version placeholder
+        if '{version}' not in entry['template']:
+            raise VAndRError(f"VERSION_FILES entry {i}: template must contain '{{version}}' placeholder")
+        
+        logger.debug(f"Validated config entry {i}: file='{entry['file']}', template='{entry['template']}'")
+    
+    logger.info(f"VERSION_FILES configuration validated successfully ({len(config)} entries)")
+
+
+def execute_command(args: argparse.Namespace) -> int:
+    """
+    Execute the appropriate command based on parsed arguments with comprehensive error handling.
+    
+    Args:
+        args: Parsed arguments namespace
+        
+    Returns:
+        Exit code (0 for success, non-zero for failure)
+    """
+    logger = logging.getLogger('v-and-r')
+    
+    try:
+        # Validate VERSION_FILES configuration before proceeding
+        logger.debug("Validating VERSION_FILES configuration")
+        validate_version_files_config(VERSION_FILES)
+        
+        # Initialize CLI interface
+        logger.debug("Initializing CLI interface")
+        cli = CLIInterface()
+        
+        # Execute the requested command
+        logger.info(f"Executing command with args: {args}")
+        return cli.execute_command(args)
+        
+    except VAndRError as e:
+        logger.error(f"Configuration error: {e}")
+        print(f"Configuration Error: {e}", file=sys.stderr)
+        print("\nPlease check your VERSION_FILES configuration and try again.", file=sys.stderr)
+        return 2
+        
+    except VersionError as e:
+        logger.error(f"Version error: {e}")
+        print(f"Version Error: {e}", file=sys.stderr)
+        print("\nPlease check your version formats and try again.", file=sys.stderr)
+        return 3
+        
+    except FileError as e:
+        logger.error(f"File error: {e}")
+        print(f"File Error: {e}", file=sys.stderr)
+        print("\nPlease check file permissions and paths, then try again.", file=sys.stderr)
+        return 4
+        
+    except GitError as e:
+        logger.error(f"Git error: {e}")
+        print(f"Git Error: {e}", file=sys.stderr)
+        print("\nPlease check your git repository status and try again.", file=sys.stderr)
+        return 5
+        
+    except KeyboardInterrupt:
+        logger.info("Operation cancelled by user (Ctrl+C)")
+        print("\nOperation cancelled by user.", file=sys.stderr)
+        return 130
+        
+    except Exception as e:
+        logger.exception(f"Unexpected error: {e}")
+        print(f"Unexpected Error: {e}", file=sys.stderr)
+        print("\nThis is an unexpected error. Please report this issue with the following details:", file=sys.stderr)
+        print(f"  - Command: {' '.join(sys.argv)}", file=sys.stderr)
+        print(f"  - Error: {type(e).__name__}: {e}", file=sys.stderr)
+        print(f"  - Python version: {sys.version}", file=sys.stderr)
+        return 1
+
+
 def main():
-    """Main entry point for the v-and-r tool"""
-    cli = CLIInterface()
-    args = cli.parse_arguments()
-    exit_code = cli.execute_command(args)
-    sys.exit(exit_code)
+    """
+    Main entry point for the v-and-r tool with comprehensive error handling and logging.
+    
+    This function orchestrates CLI parsing, command execution, and provides user-friendly
+    error messages for different types of failures.
+    """
+    # Check for debug flag early to enable logging
+    debug_mode = '--debug' in sys.argv or '-d' in sys.argv or os.getenv('V_AND_R_DEBUG', '').lower() in ('1', 'true', 'yes')
+    
+    # Set up logging
+    setup_logging(debug=debug_mode)
+    logger = logging.getLogger('v-and-r')
+    
+    logger.info("Starting v-and-r (Version and Release Manager)")
+    logger.debug(f"Command line arguments: {sys.argv}")
+    logger.debug(f"Python version: {sys.version}")
+    logger.debug(f"Working directory: {os.getcwd()}")
+    
+    try:
+        # Parse command line arguments
+        logger.debug("Parsing command line arguments")
+        cli = CLIInterface()
+        args = cli.parse_arguments()
+        
+        logger.debug(f"Parsed arguments: {args}")
+        
+        # Execute the command
+        exit_code = execute_command(args)
+        
+        logger.info(f"Command completed with exit code: {exit_code}")
+        sys.exit(exit_code)
+        
+    except SystemExit as e:
+        # Handle argparse exits (help, invalid args, etc.)
+        logger.debug(f"SystemExit caught with code: {e.code}")
+        sys.exit(e.code)
+        
+    except KeyboardInterrupt:
+        logger.info("Main execution interrupted by user")
+        print("\nOperation cancelled by user.", file=sys.stderr)
+        sys.exit(130)
+        
+    except Exception as e:
+        logger.exception(f"Fatal error in main: {e}")
+        print(f"Fatal Error: {e}", file=sys.stderr)
+        print("\nThe application encountered a fatal error and cannot continue.", file=sys.stderr)
+        print("Please report this issue with the error details above.", file=sys.stderr)
+        sys.exit(1)
+
+
+# Integration Tests for Main Execution Flow
+def test_main_execution_flow():
+    """Integration tests for main execution flow and error handling"""
+    import sys
+    from unittest import mock
+    from io import StringIO
+    
+    test_results = []
+    
+    def run_test(test_name: str, test_func):
+        """Helper to run individual tests and track results"""
+        try:
+            test_func()
+            test_results.append(f"✓ {test_name}")
+            return True
+        except Exception as e:
+            test_results.append(f"✗ {test_name}: {e}")
+            return False
+    
+    # Test VERSION_FILES validation
+    def test_version_files_validation():
+        # Test empty configuration
+        try:
+            validate_version_files_config([])
+            assert False, "Should raise VAndRError for empty config"
+        except VAndRError as e:
+            assert "empty" in str(e).lower()
+        
+        # Test invalid configuration (missing keys)
+        try:
+            validate_version_files_config([{'file': 'test.py'}])
+            assert False, "Should raise VAndRError for missing keys"
+        except VAndRError as e:
+            assert "missing required key" in str(e).lower()
+        
+        # Test invalid regex pattern
+        try:
+            validate_version_files_config([{
+                'file': 'test.py',
+                'pattern': 'not-a-regex-object',
+                'template': 'version = "{version}"'
+            }])
+            assert False, "Should raise VAndRError for invalid pattern"
+        except VAndRError as e:
+            assert "compiled regex" in str(e).lower()
+        
+        # Test valid configuration
+        valid_config = [{
+            'file': 'test.py',
+            'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+            'template': 'version = "{version}"'
+        }]
+        validate_version_files_config(valid_config)  # Should not raise
+    
+    # Test logging setup
+    def test_logging_setup():
+        # Test debug logging setup
+        setup_logging(debug=True)
+        logger = logging.getLogger('v-and-r')
+        assert logger.level == logging.DEBUG
+        
+        # Test normal logging setup
+        setup_logging(debug=False)
+        logger = logging.getLogger('v-and-r')
+        assert logger.level == logging.INFO
+    
+    # Test main execution with mocked arguments
+    def test_main_execution_with_mocked_args():
+        with mock.patch('sys.argv', ['v-and-r', '--view']):
+            with mock.patch.object(CLIInterface, 'execute_command', return_value=0) as mock_execute:
+                exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+                assert exit_code == 0
+                mock_execute.assert_called_once()
+    
+    # Test error handling in execute_command
+    def test_execute_command_error_handling():
+        # Test VAndRError handling - need to mock the CLI creation to raise the error
+        with mock.patch('__main__.CLIInterface', side_effect=VAndRError("Test error")):
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            assert exit_code == 2
+        
+        # Test VersionError handling
+        with mock.patch('__main__.CLIInterface', side_effect=VersionError("Test version error")):
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            assert exit_code == 3
+        
+        # Test FileError handling
+        with mock.patch('__main__.CLIInterface', side_effect=FileError("Test file error")):
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            assert exit_code == 4
+        
+        # Test GitError handling
+        with mock.patch('__main__.CLIInterface', side_effect=GitError("Test git error")):
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            assert exit_code == 5
+        
+        # Test unexpected error handling
+        with mock.patch('__main__.CLIInterface', side_effect=RuntimeError("Unexpected error")):
+            exit_code = execute_command(argparse.Namespace(view=True, debug=False))
+            assert exit_code == 1
+    
+    # Run all tests
+    print("\nRunning Main Execution Flow integration tests...")
+    print("=" * 50)
+    
+    tests = [
+        ("VERSION_FILES validation", test_version_files_validation),
+        ("logging setup", test_logging_setup),
+        ("main execution with mocked args", test_main_execution_with_mocked_args),
+        ("execute_command error handling", test_execute_command_error_handling),
+    ]
+    
+    passed = 0
+    for test_name, test_func in tests:
+        if run_test(test_name, test_func):
+            passed += 1
+    
+    # Print results
+    for result in test_results:
+        print(result)
+    
+    print("=" * 50)
+    print(f"Tests passed: {passed}/{len(tests)}")
+    
+    if passed == len(tests):
+        print("All Main Execution Flow tests passed! ✓")
+        return True
+    else:
+        print("Some tests failed! ✗")
+        return False
 
 
 # Unit Tests for CLIInterface
@@ -3906,12 +4251,13 @@ if __name__ == "__main__":
         print("Running all unit tests for v-and-r...")
         print("=" * 60)
         
+        main_success = test_main_execution_flow()
         cli_success = test_cli_interface()
         version_success = test_version_manager()
         file_success = test_file_manager()
         git_success = test_git_manager()
         
-        overall_success = cli_success and version_success and file_success and git_success
+        overall_success = main_success and cli_success and version_success and file_success and git_success
         
         print("\n" + "=" * 60)
         if overall_success:

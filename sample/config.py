@@ -6,7 +6,7 @@ Configuration file for sample application.
 APP_NAME = "Sample App"
 
 # Version: v1.1.5
-version = "v2.0.0"
+version = "v2.0.1"
 
 # Other configuration
 DEBUG = True
