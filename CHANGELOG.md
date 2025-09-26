@@ -1,5 +1,14 @@
 # Changelog
 ## [v0.1.1] - 2025-09-26
+### Other
+- 🔧 added --release-deploy (643d235)
+
+### Commits
+```
+643d235  🔧 added --release-deploy                                   	paulrm	2025-09-26
+```
+
+## [v0.1.1] - 2025-09-26
 ### Changed
 - Version bump to v0.1.1
 

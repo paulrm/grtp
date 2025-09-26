@@ -1,7 +1,14 @@
 {
   "version": "v0.1.1",
-  "timestamp": "2025-09-26T03:36:58.196086",
-  "commit_hash": "e740ace",
+  "timestamp": "2025-09-26T03:44:43.500852",
+  "commit_hash": "643d235",
   "previous_version": "v0.1.0",
-  "commits": []
+  "commits": [
+    {
+      "hash": "643d235b65050225e3a9efb469cb3cf0b57ab0a8",
+      "message": " \ud83d\udd27 added --release-deploy",
+      "author": "paulrm",
+      "date": "2025-09-26 03:42:18 -0300"
+    }
+  ]
 }
