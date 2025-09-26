@@ -778,23 +778,130 @@ class GitManager:
 
 
 # VERSION_FILES Configuration
+# 
+# This configuration defines which files to scan and update for version management.
+# Each entry must contain:
+# - 'file': File path or glob pattern (e.g., 'app.py', '*.py', 'src/**/*.py')
+# - 'pattern': Compiled regex with version in first capture group
+# - 'template': String template with {version} placeholder for replacement
+#
+# Common patterns and examples:
 VERSION_FILES = [
+    # README.md version badge or documentation
     {
         'file': 'README.md', 
         'pattern': re.compile(r'- Version (v\d+\.\d+\.\d+)'),
         'template': '- Version {version}',
-    },    
+    },
+    
+    # Python files with version variable (quoted)
     {
         'file': 'sample/*.py',
         'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
         'template': 'version = "{version}"',
     },
+    
+    # Python files with version comment
     {
         'file': 'sample/*.py',
         'pattern': re.compile(r'Version: (v\d+\.\d+\.\d+)'),
         'template': 'Version: {version}',
-    }
+    },
+    
+    # Additional common patterns (commented out - uncomment and modify as needed):
+    
+    # Python __init__.py files
+    # {
+    #     'file': 'src/*/__init__.py',
+    #     'pattern': re.compile(r'__version__ = "(v\d+\.\d+\.\d+)"'),
+    #     'template': '__version__ = "{version}"',
+    # },
+    
+    # setup.py or pyproject.toml version
+    # {
+    #     'file': 'setup.py',
+    #     'pattern': re.compile(r'version="(v\d+\.\d+\.\d+)"'),
+    #     'template': 'version="{version}"',
+    # },
+    
+    # package.json for Node.js projects
+    # {
+    #     'file': 'package.json',
+    #     'pattern': re.compile(r'"version": "(v\d+\.\d+\.\d+)"'),
+    #     'template': '"version": "{version}"',
+    # },
+    
+    # Docker files
+    # {
+    #     'file': 'Dockerfile',
+    #     'pattern': re.compile(r'LABEL version="(v\d+\.\d+\.\d+)"'),
+    #     'template': 'LABEL version="{version}"',
+    # },
+    
+    # Configuration files (YAML, JSON, etc.)
+    # {
+    #     'file': 'config/*.yaml',
+    #     'pattern': re.compile(r'version: (v\d+\.\d+\.\d+)'),
+    #     'template': 'version: {version}',
+    # },
 ]
+
+
+def validate_version_files_config(config: List[Dict]) -> None:
+    """
+    Validate VERSION_FILES configuration to ensure all required fields are present
+    and properly formatted.
+    
+    Args:
+        config: List of configuration dictionaries to validate
+        
+    Raises:
+        FileError: If configuration is invalid
+    """
+    if not config:
+        raise FileError("VERSION_FILES configuration cannot be empty")
+    
+    required_keys = ['file', 'pattern', 'template']
+    
+    for i, entry in enumerate(config):
+        if not isinstance(entry, dict):
+            raise FileError(f"Configuration entry {i} must be a dictionary")
+        
+        # Check required keys
+        for key in required_keys:
+            if key not in entry:
+                raise FileError(f"Configuration entry {i} missing required key: '{key}'")
+        
+        # Validate file path
+        if not isinstance(entry['file'], str) or not entry['file'].strip():
+            raise FileError(f"Configuration entry {i}: 'file' must be a non-empty string")
+        
+        # Validate pattern is compiled regex
+        if not isinstance(entry['pattern'], re.Pattern):
+            raise FileError(f"Configuration entry {i}: 'pattern' must be a compiled regex (use re.compile())")
+        
+        # Validate pattern has at least one capture group
+        if entry['pattern'].groups < 1:
+            raise FileError(f"Configuration entry {i}: regex pattern must have at least one capture group for version")
+        
+        # Validate template
+        if not isinstance(entry['template'], str):
+            raise FileError(f"Configuration entry {i}: 'template' must be a string")
+        
+        if '{version}' not in entry['template']:
+            raise FileError(f"Configuration entry {i}: template must contain '{{version}}' placeholder")
+        
+        # Warn about potential issues
+        if '*' in entry['file'] and not any(char in entry['file'] for char in ['/', '\\']):
+            print(f"Warning: Configuration entry {i} uses wildcard without directory - consider being more specific")
+
+
+# Validate configuration on module load
+try:
+    validate_version_files_config(VERSION_FILES)
+except FileError as e:
+    print(f"Error in VERSION_FILES configuration: {e}")
+    sys.exit(1)
 
 
 class CLIInterface:
