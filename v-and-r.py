@@ -264,6 +264,229 @@ class VersionManager:
         return f"{prefix}{major + 1}.0.0"
 
 
+class FileManager:
+    """Handles file operations and pattern matching for version management"""
+    
+    def __init__(self, version_files_config: List[Dict]):
+        """
+        Initialize FileManager with VERSION_FILES configuration.
+        
+        Args:
+            version_files_config: List of file configuration dictionaries
+            
+        Raises:
+            FileError: If configuration is invalid
+        """
+        if not version_files_config:
+            raise FileError("VERSION_FILES configuration cannot be empty")
+        
+        self.file_configs = []
+        for config in version_files_config:
+            self._validate_config(config)
+            file_config = FileConfig(
+                file_pattern=config['file'],
+                regex_pattern=config['pattern'],
+                template=config['template']
+            )
+            self.file_configs.append(file_config)
+    
+    def _validate_config(self, config: Dict) -> None:
+        """
+        Validate a single file configuration entry.
+        
+        Args:
+            config: Configuration dictionary to validate
+            
+        Raises:
+            FileError: If configuration is invalid
+        """
+        required_keys = ['file', 'pattern', 'template']
+        for key in required_keys:
+            if key not in config:
+                raise FileError(f"Missing required configuration key: {key}")
+        
+        if not isinstance(config['pattern'], re.Pattern):
+            raise FileError(f"Pattern must be a compiled regex object, got {type(config['pattern'])}")
+        
+        if not isinstance(config['template'], str):
+            raise FileError(f"Template must be a string, got {type(config['template'])}")
+        
+        if '{version}' not in config['template']:
+            raise FileError(f"Template must contain {{version}} placeholder: {config['template']}")
+        
+        # Validate that regex pattern has at least one capture group
+        if config['pattern'].groups < 1:
+            raise FileError(f"Regex pattern must have at least one capture group: {config['pattern'].pattern}")
+    
+    def expand_file_patterns(self) -> List[str]:
+        """
+        Expand glob patterns to actual file paths.
+        
+        Returns:
+            List of actual file paths that match the configured patterns
+        """
+        expanded_files = []
+        
+        for file_config in self.file_configs:
+            pattern = file_config.file_pattern
+            
+            if '*' in pattern or '?' in pattern:
+                # Handle glob patterns
+                matched_files = glob.glob(pattern, recursive=True)
+                if matched_files:
+                    expanded_files.extend(matched_files)
+                else:
+                    # No files match the pattern - this might be expected
+                    continue
+            else:
+                # Direct file path
+                if os.path.exists(pattern):
+                    expanded_files.append(pattern)
+        
+        # Remove duplicates and sort
+        return sorted(list(set(expanded_files)))
+    
+    def find_versions_in_files(self) -> Dict[str, str]:
+        """
+        Find current versions in all configured files.
+        
+        Returns:
+            Dictionary mapping file paths to found version strings
+            
+        Raises:
+            FileError: If file cannot be read
+        """
+        versions_found = {}
+        expanded_files = self.expand_file_patterns()
+        
+        for file_path in expanded_files:
+            # Find the matching configuration for this file
+            matching_config = None
+            for config in self.file_configs:
+                if self._file_matches_pattern(file_path, config.file_pattern):
+                    matching_config = config
+                    break
+            
+            if not matching_config:
+                continue
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Search for version using the regex pattern
+                match = matching_config.regex_pattern.search(content)
+                if match:
+                    # Extract version from first capture group
+                    version = match.group(1)
+                    versions_found[file_path] = version
+                
+            except IOError as e:
+                raise FileError(f"Cannot read file {file_path}: {e}")
+            except UnicodeDecodeError as e:
+                raise FileError(f"Cannot decode file {file_path}: {e}")
+        
+        return versions_found
+    
+    def _file_matches_pattern(self, file_path: str, pattern: str) -> bool:
+        """
+        Check if a file path matches a given pattern (including glob patterns).
+        
+        Args:
+            file_path: Path to check
+            pattern: Pattern to match against (may include wildcards)
+            
+        Returns:
+            True if file matches pattern, False otherwise
+        """
+        if '*' in pattern or '?' in pattern:
+            # Use glob-style matching
+            import fnmatch
+            return fnmatch.fnmatch(file_path, pattern)
+        else:
+            # Direct string comparison
+            return file_path == pattern
+    
+    def update_file_version(self, file_path: str, new_version: str) -> bool:
+        """
+        Update version in a specific file using its pattern and template.
+        
+        Args:
+            file_path: Path to the file to update
+            new_version: New version string to set
+            
+        Returns:
+            True if file was updated successfully, False otherwise
+            
+        Raises:
+            FileError: If file cannot be read/written or no matching config found
+        """
+        # Find the matching configuration for this file
+        matching_config = None
+        for config in self.file_configs:
+            if self._file_matches_pattern(file_path, config.file_pattern):
+                matching_config = config
+                break
+        
+        if not matching_config:
+            raise FileError(f"No configuration found for file: {file_path}")
+        
+        try:
+            # Read current file content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Find current version using regex
+            match = matching_config.regex_pattern.search(content)
+            if not match:
+                # No version found in file - this might be expected for new files
+                return False
+            
+            # Replace the matched text with new version using template
+            old_match = match.group(0)
+            new_text = matching_config.template.format(version=new_version)
+            
+            # Replace the old version text with new version text
+            updated_content = content.replace(old_match, new_text)
+            
+            # Write updated content back to file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(updated_content)
+            
+            return True
+            
+        except IOError as e:
+            raise FileError(f"Cannot access file {file_path}: {e}")
+        except UnicodeDecodeError as e:
+            raise FileError(f"Cannot decode file {file_path}: {e}")
+        except KeyError as e:
+            raise FileError(f"Template formatting error for {file_path}: {e}")
+    
+    def update_all_files(self, new_version: str) -> Dict[str, bool]:
+        """
+        Update version in all configured files.
+        
+        Args:
+            new_version: New version string to set in all files
+            
+        Returns:
+            Dictionary mapping file paths to update success status
+        """
+        results = {}
+        expanded_files = self.expand_file_patterns()
+        
+        for file_path in expanded_files:
+            try:
+                success = self.update_file_version(file_path, new_version)
+                results[file_path] = success
+            except FileError as e:
+                # Log error but continue with other files
+                results[file_path] = False
+                print(f"Warning: Failed to update {file_path}: {e}")
+        
+        return results
+
+
 # VERSION_FILES Configuration
 VERSION_FILES = [
     {
@@ -478,10 +701,363 @@ def test_version_manager():
         return False
 
 
+def test_file_manager():
+    """Comprehensive unit tests for FileManager class"""
+    import tempfile
+    import shutil
+    
+    test_results = []
+    
+    def run_test(test_name: str, test_func):
+        """Helper to run individual tests and track results"""
+        try:
+            test_func()
+            test_results.append(f"✓ {test_name}")
+            return True
+        except Exception as e:
+            test_results.append(f"✗ {test_name}: {e}")
+            return False
+    
+    # Test FileManager initialization and validation
+    def test_file_manager_init():
+        # Valid configuration
+        valid_config = [
+            {
+                'file': 'test.py',
+                'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                'template': 'version = "{version}"',
+            }
+        ]
+        fm = FileManager(valid_config)
+        assert len(fm.file_configs) == 1
+        
+        # Empty configuration should raise error
+        try:
+            FileManager([])
+            assert False, "Should raise FileError for empty config"
+        except FileError:
+            pass
+        
+        # Missing required keys
+        try:
+            FileManager([{'file': 'test.py'}])
+            assert False, "Should raise FileError for missing keys"
+        except FileError:
+            pass
+        
+        # Invalid pattern type
+        try:
+            FileManager([{
+                'file': 'test.py',
+                'pattern': 'not a regex',
+                'template': 'version = "{version}"'
+            }])
+            assert False, "Should raise FileError for invalid pattern"
+        except FileError:
+            pass
+        
+        # Template without {version} placeholder
+        try:
+            FileManager([{
+                'file': 'test.py',
+                'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                'template': 'version = "1.0.0"'
+            }])
+            assert False, "Should raise FileError for template without placeholder"
+        except FileError:
+            pass
+        
+        # Pattern without capture group
+        try:
+            FileManager([{
+                'file': 'test.py',
+                'pattern': re.compile(r'version = "v\d+\.\d+\.\d+"'),
+                'template': 'version = "{version}"'
+            }])
+            assert False, "Should raise FileError for pattern without capture group"
+        except FileError:
+            pass
+    
+    # Test file pattern matching
+    def test_file_pattern_matching():
+        config = [
+            {
+                'file': 'test.py',
+                'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                'template': 'version = "{version}"',
+            },
+            {
+                'file': '*.py',
+                'pattern': re.compile(r'VERSION = "(v\d+\.\d+\.\d+)"'),
+                'template': 'VERSION = "{version}"',
+            }
+        ]
+        fm = FileManager(config)
+        
+        # Test direct file matching
+        assert fm._file_matches_pattern('test.py', 'test.py')
+        assert not fm._file_matches_pattern('other.py', 'test.py')
+        
+        # Test glob pattern matching
+        assert fm._file_matches_pattern('app.py', '*.py')
+        assert fm._file_matches_pattern('main.py', '*.py')
+        assert not fm._file_matches_pattern('readme.txt', '*.py')
+    
+    # Test expand_file_patterns with temporary files
+    def test_expand_file_patterns():
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create test files
+            test_files = ['app.py', 'main.py', 'config.json', 'subdir/module.py']
+            for file_path in test_files:
+                full_path = os.path.join(temp_dir, file_path)
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                with open(full_path, 'w') as f:
+                    f.write('# test file')
+            
+            # Change to temp directory for glob operations
+            original_cwd = os.getcwd()
+            os.chdir(temp_dir)
+            
+            try:
+                config = [
+                    {
+                        'file': 'app.py',
+                        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'version = "{version}"',
+                    },
+                    {
+                        'file': '*.py',
+                        'pattern': re.compile(r'VERSION = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'VERSION = "{version}"',
+                    },
+                    {
+                        'file': 'nonexistent.py',
+                        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'version = "{version}"',
+                    }
+                ]
+                fm = FileManager(config)
+                
+                expanded = fm.expand_file_patterns()
+                
+                # Should find app.py, main.py (from *.py pattern)
+                # app.py might appear twice but should be deduplicated
+                assert 'app.py' in expanded
+                assert 'main.py' in expanded
+                assert 'config.json' not in expanded  # Not matching any pattern
+                
+            finally:
+                os.chdir(original_cwd)
+    
+    # Test find_versions_in_files
+    def test_find_versions_in_files():
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create test files with versions
+            test_file1 = os.path.join(temp_dir, 'app.py')
+            with open(test_file1, 'w') as f:
+                f.write('#!/usr/bin/env python3\nversion = "v1.2.3"\nprint("Hello")')
+            
+            test_file2 = os.path.join(temp_dir, 'config.py')
+            with open(test_file2, 'w') as f:
+                f.write('CONFIG_VERSION = "v2.1.0"\nother_setting = "value"')
+            
+            test_file3 = os.path.join(temp_dir, 'no_version.py')
+            with open(test_file3, 'w') as f:
+                f.write('print("No version here")')
+            
+            # Change to temp directory
+            original_cwd = os.getcwd()
+            os.chdir(temp_dir)
+            
+            try:
+                config = [
+                    {
+                        'file': 'app.py',
+                        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'version = "{version}"',
+                    },
+                    {
+                        'file': 'config.py',
+                        'pattern': re.compile(r'CONFIG_VERSION = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'CONFIG_VERSION = "{version}"',
+                    },
+                    {
+                        'file': 'no_version.py',
+                        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'version = "{version}"',
+                    }
+                ]
+                fm = FileManager(config)
+                
+                versions = fm.find_versions_in_files()
+                
+                assert versions['app.py'] == 'v1.2.3'
+                assert versions['config.py'] == 'v2.1.0'
+                assert 'no_version.py' not in versions  # No version found
+                
+            finally:
+                os.chdir(original_cwd)
+    
+    # Test update_file_version
+    def test_update_file_version():
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create test file with version
+            test_file = os.path.join(temp_dir, 'app.py')
+            original_content = '#!/usr/bin/env python3\nversion = "v1.2.3"\nprint("Hello")'
+            with open(test_file, 'w') as f:
+                f.write(original_content)
+            
+            # Change to temp directory
+            original_cwd = os.getcwd()
+            os.chdir(temp_dir)
+            
+            try:
+                config = [
+                    {
+                        'file': 'app.py',
+                        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'version = "{version}"',
+                    }
+                ]
+                fm = FileManager(config)
+                
+                # Update version
+                success = fm.update_file_version('app.py', 'v2.0.0')
+                assert success
+                
+                # Verify file was updated
+                with open(test_file, 'r') as f:
+                    updated_content = f.read()
+                
+                assert 'version = "v2.0.0"' in updated_content
+                assert 'version = "v1.2.3"' not in updated_content
+                assert '#!/usr/bin/env python3' in updated_content  # Other content preserved
+                
+                # Test updating file with no version (should return False)
+                # First add configuration for the no_version file
+                config.append({
+                    'file': 'no_version.py',
+                    'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                    'template': 'version = "{version}"',
+                })
+                fm = FileManager(config)  # Recreate with updated config
+                
+                test_file2 = os.path.join(temp_dir, 'no_version.py')
+                with open(test_file2, 'w') as f:
+                    f.write('print("No version")')
+                
+                success = fm.update_file_version('no_version.py', 'v1.0.0')
+                assert not success  # Should return False when no version found
+                
+            finally:
+                os.chdir(original_cwd)
+    
+    # Test update_all_files
+    def test_update_all_files():
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create multiple test files
+            files_content = {
+                'app.py': 'version = "v1.0.0"\nprint("App")',
+                'config.py': 'VERSION = "v1.0.0"\nconfig = {}',
+                'no_version.py': 'print("No version")'
+            }
+            
+            for filename, content in files_content.items():
+                with open(os.path.join(temp_dir, filename), 'w') as f:
+                    f.write(content)
+            
+            # Change to temp directory
+            original_cwd = os.getcwd()
+            os.chdir(temp_dir)
+            
+            try:
+                config = [
+                    {
+                        'file': 'app.py',
+                        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'version = "{version}"',
+                    },
+                    {
+                        'file': 'config.py',
+                        'pattern': re.compile(r'VERSION = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'VERSION = "{version}"',
+                    },
+                    {
+                        'file': 'no_version.py',
+                        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
+                        'template': 'version = "{version}"',
+                    }
+                ]
+                fm = FileManager(config)
+                
+                # Update all files
+                results = fm.update_all_files('v2.5.0')
+                
+                # Check results
+                assert results['app.py'] == True
+                assert results['config.py'] == True
+                assert results['no_version.py'] == False  # No version to update
+                
+                # Verify files were updated
+                with open('app.py', 'r') as f:
+                    assert 'version = "v2.5.0"' in f.read()
+                
+                with open('config.py', 'r') as f:
+                    assert 'VERSION = "v2.5.0"' in f.read()
+                
+            finally:
+                os.chdir(original_cwd)
+    
+    # Run all tests
+    print("\nRunning FileManager unit tests...")
+    print("=" * 50)
+    
+    tests = [
+        ("file_manager_init", test_file_manager_init),
+        ("file_pattern_matching", test_file_pattern_matching),
+        ("expand_file_patterns", test_expand_file_patterns),
+        ("find_versions_in_files", test_find_versions_in_files),
+        ("update_file_version", test_update_file_version),
+        ("update_all_files", test_update_all_files),
+    ]
+    
+    passed = 0
+    for test_name, test_func in tests:
+        if run_test(test_name, test_func):
+            passed += 1
+    
+    # Print results
+    for result in test_results:
+        print(result)
+    
+    print("=" * 50)
+    print(f"Tests passed: {passed}/{len(tests)}")
+    
+    if passed == len(tests):
+        print("All FileManager tests passed! ✓")
+        return True
+    else:
+        print("Some tests failed! ✗")
+        return False
+
+
 if __name__ == "__main__":
     # Check if running tests
     if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        success = test_version_manager()
-        sys.exit(0 if success else 1)
+        print("Running all unit tests for v-and-r...")
+        print("=" * 60)
+        
+        version_success = test_version_manager()
+        file_success = test_file_manager()
+        
+        overall_success = version_success and file_success
+        
+        print("\n" + "=" * 60)
+        if overall_success:
+            print("All tests passed! ✓")
+        else:
+            print("Some tests failed! ✗")
+        
+        sys.exit(0 if overall_success else 1)
     else:
         main()
