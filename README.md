@@ -1,6 +1,6 @@
 # v-and-r (Version and Release Manager)
 
-- Version v0.0.0
+- Version v0.0.1
 
 A command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 
@@ -443,7 +443,8 @@ Use glob patterns for recursive directory scanning:
 5. Submit a pull request
 
 ## Roadmap
-
+- [ ] Issue: missing `--release-deploy` execute the git tag v1.0.0 -m "Release Name"
+- [ ] Issue: missing `-rd TAG` get the last commits from TAG to HEAD
 - [ ] Add Release Name generator for major and minor releases
 - [ ] Add support for pre-release and build metadata (e.g., v1.0.0-alpha, v1.0.0+build.1)
 - [ ] Add `--dry-run` flag for testing changes without applying them
