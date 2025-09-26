@@ -1,9 +1,21 @@
 {
   "version": "v2.0.0",
-  "timestamp": "2025-09-26T02:27:02.146549",
-  "commit_hash": "55c6d7e",
+  "timestamp": "2025-09-26T02:43:21.911119",
+  "commit_hash": "197f790",
   "previous_version": null,
   "commits": [
+    {
+      "hash": "197f79060a35cf73d4b6908711827a8421f1efe7",
+      "message": "\ud83d\udd27 Task 9 / Implemented git diff and commit history commands and tests, added roadmap to readme",
+      "author": "paulrm",
+      "date": "2025-09-26 02:37:01 -0300"
+    },
+    {
+      "hash": "261353657f60550ffd7a8f2ab446bbc6b3938406",
+      "message": "\ud83d\ude80 Task 9 / Implement git diff and commit history commands",
+      "author": "paulrm",
+      "date": "2025-09-26 02:29:04 -0300"
+    },
     {
       "hash": "55c6d7e2542498016a072928fd670e143fcbf239",
       "message": "\ud83d\ude80 Task 7 / Implement version increment commands (patch, minor, major)",
