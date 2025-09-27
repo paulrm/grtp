@@ -1,6 +1,6 @@
 # v-and-r (Version and Release Manager)
 
-- Version v0.2.2
+- Version v0.2.3
 
 A command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 
@@ -100,12 +100,12 @@ Edit the `VERSION_FILES` array in `v-and-r.py`:
 VERSION_FILES = [
     {
         'file': 'README.md',
-        'pattern': re.compile(r'- Version (v\d+\.\d+\.\d+)'),
-        'template': '- Version {version}',
+        'pattern': re.compile(r'- Version v(\d+\.\d+\.\d+)'),
+        'template': '- Version v{version}',
     },
     {
         'file': 'package.json',
-        'pattern': re.compile(r'"version": "(v\d+\.\d+\.\d+)"'),
+        'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
         'template': '"version": "{version}"',
     },
 ]
@@ -131,8 +131,8 @@ We welcome contributions! See our [Contributing Guide](docs/contributing.md) for
 - Feature requests
 - Bug reports
 
-## 🐛 Know bugs
-- [ ] version should be only 3 integers separated by dots, the prefixed v should resolved in config VERSION_FILES
+## 🐛 Known bugs
+- [x] ~~version should be only 3 integers separated by dots, the prefixed v should resolved in config VERSION_FILES~~ **FIXED**
 
 
 ## 📋 Roadmap

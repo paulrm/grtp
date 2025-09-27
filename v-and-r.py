@@ -49,11 +49,10 @@ class Version:
     major: int
     minor: int
     patch: int
-    prefix: str = "v"
     
     def __str__(self) -> str:
-        """String representation of version"""
-        return f"{self.prefix}{self.major}.{self.minor}.{self.patch}"
+        """String representation of version as pure numbers"""
+        return f"{self.major}.{self.minor}.{self.patch}"
     
     def __lt__(self, other: 'Version') -> bool:
         """Enable version comparison for sorting"""
@@ -185,10 +184,10 @@ class VersionManager:
         Find the highest semantic version from a list of version strings.
         
         Args:
-            versions: List of version strings
+            versions: List of version strings (with or without v prefix)
             
         Returns:
-            The highest version string from the list
+            The highest version string as pure numbers (no prefix)
             
         Raises:
             VersionError: If no valid versions found or list is empty
@@ -200,9 +199,7 @@ class VersionManager:
         for version in versions:
             try:
                 major, minor, patch = self.parse_version(version)
-                # Preserve original prefix (v or no v)
-                prefix = "v" if version.strip().startswith("v") else ""
-                valid_versions.append((Version(major, minor, patch, prefix), version))
+                valid_versions.append(Version(major, minor, patch))
             except VersionError:
                 # Skip invalid versions but continue processing
                 continue
@@ -210,60 +207,57 @@ class VersionManager:
         if not valid_versions:
             raise VersionError("No valid versions found in the provided list")
         
-        # Sort by Version object and return the original string of the highest
-        highest_version_obj, highest_version_str = max(valid_versions, key=lambda x: x[0])
-        return highest_version_str
+        # Sort by Version object and return as pure numbers
+        highest_version_obj = max(valid_versions)
+        return f"{highest_version_obj.major}.{highest_version_obj.minor}.{highest_version_obj.patch}"
     
     def increment_patch(self, version: str) -> str:
         """
-        Increment patch version (e.g., v1.2.3 -> v1.2.4).
+        Increment patch version (e.g., 1.2.3 -> 1.2.4).
         
         Args:
-            version: Current version string
+            version: Current version string (with or without v prefix)
             
         Returns:
-            New version string with incremented patch
+            New version string as pure numbers (no prefix)
             
         Raises:
             VersionError: If version string is invalid
         """
         major, minor, patch = self.parse_version(version)
-        prefix = "v" if version.strip().startswith("v") else ""
-        return f"{prefix}{major}.{minor}.{patch + 1}"
+        return f"{major}.{minor}.{patch + 1}"
     
     def increment_minor(self, version: str) -> str:
         """
-        Increment minor version and reset patch to 0 (e.g., v1.2.3 -> v1.3.0).
+        Increment minor version and reset patch to 0 (e.g., 1.2.3 -> 1.3.0).
         
         Args:
-            version: Current version string
+            version: Current version string (with or without v prefix)
             
         Returns:
-            New version string with incremented minor and reset patch
+            New version string as pure numbers (no prefix)
             
         Raises:
             VersionError: If version string is invalid
         """
         major, minor, patch = self.parse_version(version)
-        prefix = "v" if version.strip().startswith("v") else ""
-        return f"{prefix}{major}.{minor + 1}.0"
+        return f"{major}.{minor + 1}.0"
     
     def increment_major(self, version: str) -> str:
         """
-        Increment major version and reset minor and patch to 0 (e.g., v1.2.3 -> v2.0.0).
+        Increment major version and reset minor and patch to 0 (e.g., 1.2.3 -> 2.0.0).
         
         Args:
-            version: Current version string
+            version: Current version string (with or without v prefix)
             
         Returns:
-            New version string with incremented major and reset minor/patch
+            New version string as pure numbers (no prefix)
             
         Raises:
             VersionError: If version string is invalid
         """
         major, minor, patch = self.parse_version(version)
-        prefix = "v" if version.strip().startswith("v") else ""
-        return f"{prefix}{major + 1}.0.0"
+        return f"{major + 1}.0.0"
 
 
 class FileManager:
@@ -948,48 +942,55 @@ class GitManager:
 #
 # Common patterns and examples:
 VERSION_FILES = [
-    # README.md version badge or documentation
+    # README.md version badge or documentation (with v prefix)
     {
         'file': 'README.md', 
-        'pattern': re.compile(r'- Version (v\d+\.\d+\.\d+)'),
-        'template': '- Version {version}',
+        'pattern': re.compile(r'- Version v(\d+\.\d+\.\d+)'),
+        'template': '- Version v{version}',
     },
+    # Chrome extension popup.js (with v prefix)
     {
         'file': 'chrome-extension/popup.js',
-        'pattern': re.compile(r'const VERSION = "(v\d+\.\d+\.\d+)"'),
-        'template': 'const VERSION = "{version}"'
+        'pattern': re.compile(r'const VERSION = "v(\d+\.\d+\.\d+)"'),
+        'template': 'const VERSION = "v{version}"'
     },
-    #   "version": "1.6.20", (manifest.json)
+    # Chrome extension manifest.json (no v prefix - standard format)
     {
         'file': 'chrome-extension/manifest.json',
         'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
         'template': '"version": "{version}"',
     },
+     # VScode  extension package.json (no v prefix - standard format)
     {
-        # const VERSION = '1.6.16';
+        'file': 'vscode-extension/package.json',
+        'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
+        'template': '"version": "{version}"',
+    },
+    # PHP API file (with v prefix)
+    {
         'file': 'api.php',
-        'pattern': re.compile(r"const VERSION = \"(v\d+\.\d+\.\d+)\""),
-        'template': "const VERSION = \"{version}\""
+        'pattern': re.compile(r"const VERSION = \"v(\d+\.\d+\.\d+)\""),
+        'template': "const VERSION = \"v{version}\""
     },
     # Comment in PHP
     # {
     #     # * @version 1.6.16
     #     'file': 'api.php',
-    #     'pattern': re.compile(r" \* @version (v\d+\.\d+\.\d+)"),
-    #     'template': '* @version {version};'    
+    #     'pattern': re.compile(r" \* @version v(\d+\.\d+\.\d+)"),
+    #     'template': '* @version v{version};'    
     # },
-    # Python files with version variable (quoted)
+    # Python files with version variable (with v prefix)
     {
         'file': 'sample/*.py',
-        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
-        'template': 'version = "{version}"',
+        'pattern': re.compile(r'version = "v(\d+\.\d+\.\d+)"'),
+        'template': 'version = "v{version}"',
     },
     
-    # Python files with version comment
+    # Python files with version comment (with v prefix)
     {
         'file': 'sample/*.py',
-        'pattern': re.compile(r'Version: (v\d+\.\d+\.\d+)'),
-        'template': 'Version: {version}',
+        'pattern': re.compile(r'Version: v(\d+\.\d+\.\d+)'),
+        'template': 'Version: v{version}',
     },
     
     # Additional common patterns (commented out - uncomment and modify as needed):
