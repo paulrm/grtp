@@ -1277,6 +1277,7 @@ Examples:
   v-and-r                    # View current versions with next patch version (default)
   v-and-r -v                 # View current versions with next patch version
   v-and-r --view             # View current versions with next patch version
+  v-and-r -v --git           # View current versions with git information
   v-and-r -v -p              # View current versions with next patch version
   v-and-r -v -mi             # View current versions with next minor version
   v-and-r -v -ma             # View current versions with next major version
@@ -1323,6 +1324,13 @@ Configuration:
             '-v', '--view',
             action='store_true',
             help='View current versions across all configured files (default behavior)'
+        )
+        
+        # Git information flag (works with --view)
+        parser.add_argument(
+            '--git',
+            action='store_true',
+            help='Show git information (tags, commits) when using --view'
         )
         
         # Version increment commands (not in mutually exclusive group to allow combination with --view)
@@ -1502,7 +1510,8 @@ Configuration:
         elif args.view:
             # View command with next version preview (default to patch if no increment type specified)
             next_version_type = increment_type if increment_type else "patch"
-            return self._execute_view_command(next_version_type)
+            show_git = getattr(args, 'git', False)
+            return self._execute_view_command(next_version_type, show_git)
         elif increment_type and not args.view:
             # Increment command (actual file modification)
             return self._execute_increment_command(increment_type)
@@ -1522,7 +1531,8 @@ Configuration:
             return self._execute_release_deploy_command(message)
         else:
             # Default to view if no command specified (with default patch preview)
-            return self._execute_view_command("patch")
+            show_git = getattr(args, 'git', False)
+            return self._execute_view_command("patch", show_git)
     
     def _execute_init_command(self) -> int:
         """
@@ -1564,12 +1574,13 @@ Configuration:
             print(f"Error creating configuration file: {e}")
             return 1
     
-    def _execute_view_command(self, next_version_type: Optional[str] = None) -> int:
+    def _execute_view_command(self, next_version_type: Optional[str] = None, show_git: bool = False) -> int:
         """
         Execute view command to display current versions and optionally next version.
         
         Args:
             next_version_type: Type of next version to show ('patch', 'minor', 'major'), or None
+            show_git: Whether to display git information (tags, commits)
         
         Returns:
             Exit code (0 for success, 1 for failure)
@@ -1632,8 +1643,9 @@ Configuration:
             print(f"\nWarning: Could not determine highest version: {e}")
             logger.warning(f"Could not determine highest version: {e}")
         
-        # Add git information if in a git repository
-        self._display_git_information()
+        # Add git information if requested and in a git repository
+        if show_git:
+            self._display_git_information()
         
         logger.info("View command completed successfully")
         return 0

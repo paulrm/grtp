@@ -4,6 +4,18 @@
 
 A command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 
+
+## Usage
+```
+v-and-r view (default) --git 
+v-and-r patch 
+v-and-r minor
+v-and-r major
+v-and-r release-prepare
+v-and-r release-deploy
+
+```
+
 ## 🚀 Quick Start
 
 ```bash
