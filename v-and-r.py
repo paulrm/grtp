@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-v-and-r (Version and Release Manager)
+ATDD v-and-r (Version and Release Manager)
 
 A command-line tool that automates version management and release processes 
 across multiple project files. Follows semantic versioning principles and 
@@ -483,6 +483,157 @@ class FileManager:
         return results
 
 
+class ConfigManager:
+    """Handles configuration file loading and management"""
+    
+    CONFIG_FILENAME = '.v-and-r.json'
+    
+    def __init__(self):
+        """Initialize ConfigManager"""
+        pass
+    
+    def config_exists(self, directory: str = '.') -> bool:
+        """
+        Check if configuration file exists in the specified directory.
+        
+        Args:
+            directory: Directory to check for config file
+            
+        Returns:
+            True if config file exists, False otherwise
+        """
+        config_path = os.path.join(directory, self.CONFIG_FILENAME)
+        return os.path.exists(config_path)
+    
+    def load_config(self, directory: str = '.') -> Dict:
+        """
+        Load configuration from .v-and-r.json file.
+        
+        Args:
+            directory: Directory to load config from
+            
+        Returns:
+            Configuration dictionary
+            
+        Raises:
+            FileError: If config file cannot be read or parsed
+        """
+        config_path = os.path.join(directory, self.CONFIG_FILENAME)
+        
+        if not os.path.exists(config_path):
+            raise FileError(f"Configuration file not found: {config_path}")
+        
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+            
+            # Validate required structure
+            if 'VERSION_FILES' not in config_data:
+                raise FileError(f"Configuration file missing 'VERSION_FILES' key: {config_path}")
+            
+            if not isinstance(config_data['VERSION_FILES'], list):
+                raise FileError(f"'VERSION_FILES' must be a list in: {config_path}")
+            
+            # Convert regex patterns from strings to compiled patterns
+            for file_config in config_data['VERSION_FILES']:
+                if 'pattern' in file_config and isinstance(file_config['pattern'], str):
+                    try:
+                        file_config['pattern'] = re.compile(file_config['pattern'])
+                    except re.error as e:
+                        raise FileError(f"Invalid regex pattern in {config_path}: {e}")
+            
+            return config_data
+            
+        except json.JSONDecodeError as e:
+            raise FileError(f"Invalid JSON in configuration file {config_path}: {e}")
+        except IOError as e:
+            raise FileError(f"Cannot read configuration file {config_path}: {e}")
+    
+    def save_config(self, config_data: Dict, directory: str = '.') -> None:
+        """
+        Save configuration to .v-and-r.json file.
+        
+        Args:
+            config_data: Configuration dictionary to save
+            directory: Directory to save config to
+            
+        Raises:
+            FileError: If config file cannot be written
+        """
+        config_path = os.path.join(directory, self.CONFIG_FILENAME)
+        
+        # Convert compiled regex patterns to strings for JSON serialization
+        serializable_config = json.loads(json.dumps(config_data, default=str))
+        
+        # Convert regex patterns to string representations
+        for file_config in serializable_config.get('VERSION_FILES', []):
+            if 'pattern' in file_config and hasattr(file_config['pattern'], 'pattern'):
+                file_config['pattern'] = file_config['pattern'].pattern
+        
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(serializable_config, f, indent=2, ensure_ascii=False)
+        except IOError as e:
+            raise FileError(f"Cannot write configuration file {config_path}: {e}")
+    
+    def create_default_config(self, directory: str = '.') -> Dict:
+        """
+        Create a default configuration file.
+        
+        Args:
+            directory: Directory to create config in
+            
+        Returns:
+            Default configuration dictionary
+            
+        Raises:
+            FileError: If config file cannot be created
+        """
+        default_config = {
+            "VERSION_FILES": [
+                {
+                    "file": "README.md",
+                    "pattern": r"- Version v(\d+\.\d+\.\d+)",
+                    "template": "- Version v{version}"
+                },
+                {
+                    "file": "package.json",
+                    "pattern": r'"version": "(\d+\.\d+\.\d+)"',
+                    "template": '"version": "{version}"'
+                },
+                {
+                    "file": "*.py",
+                    "pattern": r'version = "v(\d+\.\d+\.\d+)"',
+                    "template": 'version = "v{version}"'
+                }
+            ]
+        }
+        
+        self.save_config(default_config, directory)
+        return default_config
+    
+    def get_version_files_config(self, directory: str = '.') -> List[Dict]:
+        """
+        Get VERSION_FILES configuration, preferring external config over embedded.
+        
+        Args:
+            directory: Directory to check for external config
+            
+        Returns:
+            List of file configuration dictionaries
+            
+        Raises:
+            FileError: If configuration cannot be loaded
+        """
+        if self.config_exists(directory):
+            # Use external configuration
+            config_data = self.load_config(directory)
+            return config_data['VERSION_FILES']
+        else:
+            # Fall back to embedded configuration
+            return get_embedded_version_files_config()
+
+
 class GitManager:
     """Handles git integration for release management"""
     
@@ -932,16 +1083,15 @@ class GitManager:
             return True
 
 
-# VERSION_FILES Configuration
-# 
-# This configuration defines which files to scan and update for version management.
-# Each entry must contain:
-# - 'file': File path or glob pattern (e.g., 'app.py', '*.py', 'src/**/*.py')
-# - 'pattern': Compiled regex with version in first capture group
-# - 'template': String template with {version} placeholder for replacement
-#
-# Common patterns and examples:
-VERSION_FILES = [
+def get_embedded_version_files_config() -> List[Dict]:
+    """
+    Get the embedded VERSION_FILES configuration.
+    This serves as the fallback when no external .v-and-r.json file exists.
+    
+    Returns:
+        List of file configuration dictionaries
+    """
+    return [
     # README.md version badge or documentation (with v prefix)
     {
         'file': 'README.md', 
@@ -1023,13 +1173,13 @@ VERSION_FILES = [
     #     'template': 'LABEL version="{version}"',
     # },
     
-    # Configuration files (YAML, JSON, etc.)
-    # {
-    #     'file': 'config/*.yaml',
-    #     'pattern': re.compile(r'version: (v\d+\.\d+\.\d+)'),
-    #     'template': 'version: {version}',
-    # },
-]
+        # Configuration files (YAML, JSON, etc.)
+        # {
+        #     'file': 'config/*.yaml',
+        #     'pattern': re.compile(r'version: (v\d+\.\d+\.\d+)'),
+        #     'template': 'version: {version}',
+        # },
+    ]
 
 
 def validate_version_files_config(config: List[Dict]) -> None:
@@ -1081,11 +1231,11 @@ def validate_version_files_config(config: List[Dict]) -> None:
             print(f"Warning: Configuration entry {i} uses wildcard without directory - consider being more specific")
 
 
-# Validate configuration on module load
+# Validate embedded configuration on module load
 try:
-    validate_version_files_config(VERSION_FILES)
+    validate_version_files_config(get_embedded_version_files_config())
 except FileError as e:
-    print(f"Error in VERSION_FILES configuration: {e}")
+    print(f"Error in embedded VERSION_FILES configuration: {e}")
     sys.exit(1)
 
 
@@ -1095,7 +1245,16 @@ class CLIInterface:
     def __init__(self):
         """Initialize CLI interface with managers"""
         self.version_manager = VersionManager()
-        self.file_manager = FileManager(VERSION_FILES)
+        self.config_manager = ConfigManager()
+        
+        # Load configuration (external or embedded)
+        try:
+            version_files_config = self.config_manager.get_version_files_config()
+            self.file_manager = FileManager(version_files_config)
+        except FileError as e:
+            print(f"Error loading configuration: {e}")
+            sys.exit(1)
+            
         self.git_manager = GitManager()
     
     def parse_arguments(self) -> argparse.Namespace:
@@ -1114,6 +1273,7 @@ class CLIInterface:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
+  v-and-r --init             # Create default .v-and-r.json configuration file
   v-and-r                    # View current versions with next patch version (default)
   v-and-r -v                 # View current versions with next patch version
   v-and-r --view             # View current versions with next patch version
@@ -1140,14 +1300,23 @@ Examples:
   v-and-r --release-deploy -m "Release v1.2.3"  # Create annotated git tag
 
 Configuration:
-  The tool uses VERSION_FILES configuration embedded in the script.
-  Modify the VERSION_FILES array to customize file patterns, regex patterns,
+  The tool uses .v-and-r.json configuration file if present in the current directory,
+  otherwise falls back to embedded VERSION_FILES configuration.
+  Use 'v-and-r --init' to create a default configuration file.
+  Modify the configuration to customize file patterns, regex patterns,
   and templates for your project structure.
             """
         )
         
         # Create mutually exclusive group for main commands (excluding increment commands)
         command_group = parser.add_mutually_exclusive_group()
+        
+        # Init command
+        command_group.add_argument(
+            '--init',
+            action='store_true',
+            help='Create a default .v-and-r.json configuration file in the current directory'
+        )
         
         # View command (default)
         command_group.add_argument(
@@ -1305,7 +1474,9 @@ Configuration:
         
         # Log the command being executed
         command_name = "view"  # default
-        if args.view and increment_type:
+        if args.init:
+            command_name = "init"
+        elif args.view and increment_type:
             command_name = f"view-next-{increment_type}"
         elif increment_type and not args.view:
             command_name = increment_type
@@ -1326,7 +1497,9 @@ Configuration:
         logger.info(f"Executing command: {command_name}")
         
         # Execute the appropriate command (error handling is done at higher level)
-        if args.view:
+        if args.init:
+            return self._execute_init_command()
+        elif args.view:
             # View command with next version preview (default to patch if no increment type specified)
             next_version_type = increment_type if increment_type else "patch"
             return self._execute_view_command(next_version_type)
@@ -1350,6 +1523,46 @@ Configuration:
         else:
             # Default to view if no command specified (with default patch preview)
             return self._execute_view_command("patch")
+    
+    def _execute_init_command(self) -> int:
+        """
+        Execute init command to create a default .v-and-r.json configuration file.
+        
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        logger = logging.getLogger('v-and-r')
+        logger.debug("Executing init command")
+        
+        config_path = os.path.join('.', self.config_manager.CONFIG_FILENAME)
+        
+        # Check if config file already exists
+        if self.config_manager.config_exists('.'):
+            print(f"Configuration file already exists: {config_path}")
+            print("Use --force to overwrite (not implemented yet)")
+            return 1
+        
+        try:
+            # Create default configuration
+            logger.debug("Creating default configuration file")
+            default_config = self.config_manager.create_default_config('.')
+            
+            print(f"Created default configuration file: {config_path}")
+            print()
+            print("Default configuration includes patterns for:")
+            print("  - README.md version badges")
+            print("  - package.json version field")
+            print("  - Python files with version variables")
+            print()
+            print("Edit the configuration file to customize patterns for your project.")
+            print("Run 'v-and-r --view' to test your configuration.")
+            
+            return 0
+            
+        except FileError as e:
+            logger.error(f"Failed to create configuration file: {e}")
+            print(f"Error creating configuration file: {e}")
+            return 1
     
     def _execute_view_command(self, next_version_type: Optional[str] = None) -> int:
         """
@@ -2849,11 +3062,7 @@ def execute_command(args: argparse.Namespace) -> int:
     logger = logging.getLogger('v-and-r')
     
     try:
-        # Validate VERSION_FILES configuration before proceeding
-        logger.debug("Validating VERSION_FILES configuration")
-        validate_version_files_config(VERSION_FILES)
-        
-        # Initialize CLI interface
+        # Initialize CLI interface (configuration validation happens in __init__)
         logger.debug("Initializing CLI interface")
         cli = CLIInterface()
         
@@ -3315,7 +3524,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='y'):  # User confirms
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.4"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('patch')
                                 assert result == 0
@@ -3347,7 +3556,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', side_effect=FileError("Write failed")):
                     with mock.patch('builtins.input', side_effect=['y', 'y']):  # Confirm update, then rollback
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.4"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('minor')
                                 assert result == 1
@@ -3369,7 +3578,7 @@ def test_cli_interface():
         
         # Test successful rollback
         original_contents = {
-            'app.py': 'version = "v1.2.3"',
+            'app.py': 'version = "v1.2.4"',
             'config.py': 'VERSION = "v1.2.3"'
         }
         update_results = {
@@ -3406,7 +3615,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='yes'):
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.4"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('patch')
                                 assert result == 0
@@ -3421,7 +3630,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='y'):
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.4"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('minor')
                                 assert result == 0
@@ -3435,7 +3644,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='y'):
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.3"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.2.4"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('major')
                                 assert result == 0
@@ -4423,7 +4632,7 @@ def test_file_manager():
             # Create test files with versions
             test_file1 = os.path.join(temp_dir, 'app.py')
             with open(test_file1, 'w') as f:
-                f.write('#!/usr/bin/env python3\nversion = "v1.2.3"\nprint("Hello")')
+                f.write('#!/usr/bin/env python3\nversion = "v1.2.4"\nprint("Hello")')
             
             test_file2 = os.path.join(temp_dir, 'config.py')
             with open(test_file2, 'w') as f:
@@ -4471,7 +4680,7 @@ def test_file_manager():
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create test file with version
             test_file = os.path.join(temp_dir, 'app.py')
-            original_content = '#!/usr/bin/env python3\nversion = "v1.2.3"\nprint("Hello")'
+            original_content = '#!/usr/bin/env python3\nversion = "v1.2.4"\nprint("Hello")'
             with open(test_file, 'w') as f:
                 f.write(original_content)
             
@@ -4498,7 +4707,7 @@ def test_file_manager():
                     updated_content = f.read()
                 
                 assert 'version = "v2.0.0"' in updated_content
-                assert 'version = "v1.2.3"' not in updated_content
+                assert 'version = "v1.2.4"' not in updated_content
                 assert '#!/usr/bin/env python3' in updated_content  # Other content preserved
                 
                 # Test updating file with no version (should return False)

@@ -1,6 +1,6 @@
 # v-and-r (Version and Release Manager)
 
-- Version v0.2.3
+- Version v1.2.4
 
 A command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 
@@ -92,24 +92,38 @@ Summary: 1 changed file, 1 untracked file
 - **CHANGELOG.md**: Human-readable change history  
 - **RELEASES.md**: Release summaries and highlights
 
-## 🔧 Basic Configuration
+## 🔧 Configuration
 
-Edit the `VERSION_FILES` array in `v-and-r.py`:
+### External Configuration (Recommended)
 
-```python
-VERSION_FILES = [
-    {
-        'file': 'README.md',
-        'pattern': re.compile(r'- Version v(\d+\.\d+\.\d+)'),
-        'template': '- Version v{version}',
-    },
-    {
-        'file': 'package.json',
-        'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
-        'template': '"version": "{version}"',
-    },
-]
+Create a `.v-and-r.json` configuration file in your project root:
+
+```bash
+v-and-r --init  # Creates default .v-and-r.json
 ```
+
+Edit the generated `.v-and-r.json` file:
+
+```json
+{
+  "VERSION_FILES": [
+    {
+      "file": "README.md",
+      "pattern": "- Version v(\\d+\\.\\d+\\.\\d+)",
+      "template": "- Version v{version}"
+    },
+    {
+      "file": "*.py",
+      "pattern": "version = \"v(\\d+\\.\\d+\\.\\d+)\"",
+      "template": "version = \"v{version}\""
+    }
+  ]
+}
+```
+
+### Embedded Configuration (Fallback)
+
+If no `.v-and-r.json` file exists, the tool uses embedded configuration in `v-and-r.py`. This provides backward compatibility but external configuration is recommended for easier maintenance.
 
 See [Configuration Guide](docs/configuration.md) for detailed examples and patterns.
 
