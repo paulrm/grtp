@@ -31,16 +31,16 @@
 ## Common Commands
 ```bash
 # Development
-python v-and-r.py --help          # View all options
-python v-and-r.py --view          # Check current versions
-python v-and-r.py --patch         # Increment patch version
+python grtp.py --help          # View all options
+python grtp.py --view          # Check current versions
+python grtp.py --patch         # Increment patch version
 
 # Testing version patterns
-python v-and-r.py --view          # Verify pattern matching works
+python grtp.py --view          # Verify pattern matching works
 
 # Release workflow
-python v-and-r.py --minor         # Bump minor version
-python v-and-r.py --release-info  # Generate release notes
+python grtp.py --minor         # Bump minor version
+python grtp.py --release-info  # Generate release notes
 ```
 
 ## File Processing

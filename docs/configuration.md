@@ -2,42 +2,70 @@
 
 ## Overview
 
-v-and-r uses a `VERSION_FILES` configuration array embedded in the script. This array defines which files to scan and update, along with the patterns to match and templates for replacement.
+grtp supports two configuration methods:
 
-## Basic Configuration
+1. **External Configuration** (Recommended): `.grtp.json` file in your project root
+2. **Embedded Configuration** (Fallback): `VERSION_FILES` array in the script
+
+The tool automatically uses external configuration if available, otherwise falls back to embedded configuration.
+
+## External Configuration (Recommended)
+
+### Creating Configuration
+
+Create a default configuration file:
+
+```bash
+grtp --init
+```
+
+This creates `.grtp.json` with default patterns for common file types.
 
 ### Configuration Structure
 
 Each configuration entry must contain:
 - **`file`**: File path or glob pattern (supports wildcards like `*.py`, `src/**/*.py`)
-- **`pattern`**: Compiled regex pattern with version in the first capture group
+- **`pattern`**: Regex pattern string with version in the first capture group
 - **`template`**: String template with `{version}` placeholder for replacement
 
-### Example Configuration
+### Example External Configuration
+
+```json
+{
+  "VERSION_FILES": [
+    {
+      "file": "README.md",
+      "pattern": "- Version v(\\d+\\.\\d+\\.\\d+)",
+      "template": "- Version v{version}"
+    },
+    {
+      "file": "src/*.py",
+      "pattern": "version = \"v(\\d+\\.\\d+\\.\\d+)\"",
+      "template": "version = \"v{version}\""
+    },
+    {
+      "file": "src/*/__init__.py",
+      "pattern": "__version__ = \"v(\\d+\\.\\d+\\.\\d+)\"",
+      "template": "__version__ = \"v{version}\""
+    }
+  ]
+}
+```
+
+## Embedded Configuration (Fallback)
+
+If no `.grtp.json` file exists, the tool uses embedded configuration in `grtp.py`:
 
 ```python
-VERSION_FILES = [
-    # README.md version badge
-    {
-        'file': 'README.md', 
-        'pattern': re.compile(r'- Version (v\d+\.\d+\.\d+)'),
-        'template': '- Version {version}',
-    },
-    
-    # Python files with version variable
-    {
-        'file': 'src/*.py',
-        'pattern': re.compile(r'version = "(v\d+\.\d+\.\d+)"'),
-        'template': 'version = "{version}"',
-    },
-    
-    # Package __init__.py files
-    {
-        'file': 'src/*/__init__.py',
-        'pattern': re.compile(r'__version__ = "(v\d+\.\d+\.\d+)"'),
-        'template': '__version__ = "{version}"',
-    },
-]
+def get_embedded_version_files_config() -> List[Dict]:
+    return [
+        {
+            'file': 'README.md', 
+            'pattern': re.compile(r'- Version v(\d+\.\d+\.\d+)'),
+            'template': '- Version v{version}',
+        },
+        # ... more patterns
+    ]
 ```
 
 ## Common Configuration Patterns

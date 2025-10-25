@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-ATDD v-and-r (Version and Release Manager)
+grtp - Grey Red Teal Purple (ATDD/TDD Process Automation)
 
-A command-line tool that automates version management and release processes 
-across multiple project files. Follows semantic versioning principles and 
-integrates with git for release management.
+A command-line tool that helps with ATDD/TDD process automation and automates 
+version management and release processes across multiple project files. 
+Follows semantic versioning principles and integrates with git for release management.
 """
 
 import re
@@ -22,22 +22,22 @@ from pathlib import Path
 
 
 # Custom Exception Classes
-class VAndRError(Exception):
-    """Base exception for v-and-r tool"""
+class GrtpError(Exception):
+    """Base exception for grtp tool"""
     pass
 
 
-class VersionError(VAndRError):
+class VersionError(GrtpError):
     """Version-related errors"""
     pass
 
 
-class FileError(VAndRError):
+class FileError(GrtpError):
     """File operation errors"""
     pass
 
 
-class GitError(VAndRError):
+class GitError(GrtpError):
     """Git integration errors"""
     pass
 
@@ -486,7 +486,7 @@ class FileManager:
 class ConfigManager:
     """Handles configuration file loading and management"""
     
-    CONFIG_FILENAME = '.v-and-r.json'
+    CONFIG_FILENAME = '.grtp.json'
     
     def __init__(self):
         """Initialize ConfigManager"""
@@ -507,7 +507,7 @@ class ConfigManager:
     
     def load_config(self, directory: str = '.') -> Dict:
         """
-        Load configuration from .v-and-r.json file.
+        Load configuration from .grtp.json file.
         
         Args:
             directory: Directory to load config from
@@ -551,7 +551,7 @@ class ConfigManager:
     
     def save_config(self, config_data: Dict, directory: str = '.') -> None:
         """
-        Save configuration to .v-and-r.json file.
+        Save configuration to .grtp.json file.
         
         Args:
             config_data: Configuration dictionary to save
@@ -1086,7 +1086,7 @@ class GitManager:
 def get_embedded_version_files_config() -> List[Dict]:
     """
     Get the embedded VERSION_FILES configuration.
-    This serves as the fallback when no external .v-and-r.json file exists.
+    This serves as the fallback when no external .grtp.json file exists.
     
     Returns:
         List of file configuration dictionaries
@@ -1240,7 +1240,7 @@ except FileError as e:
 
 
 class CLIInterface:
-    """Main CLI interface for v-and-r tool with argument parsing and command execution"""
+    """Main CLI interface for grtp tool with argument parsing and command execution"""
     
     def __init__(self):
         """Initialize CLI interface with managers"""
@@ -1268,42 +1268,42 @@ class CLIInterface:
             SystemExit: If invalid arguments provided or help requested
         """
         parser = argparse.ArgumentParser(
-            prog='v-and-r',
-            description='Version and Release Manager - Automate version management and release processes',
+            prog='grtp',
+            description='grtp - Grey Red Teal Purple: ATDD/TDD Process Automation and Version Management',
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  v-and-r --init             # Create default .v-and-r.json configuration file
-  v-and-r                    # View current versions with next patch version (default)
-  v-and-r -v                 # View current versions with next patch version
-  v-and-r --view             # View current versions with next patch version
-  v-and-r -v --git           # View current versions with git information
-  v-and-r -v -p              # View current versions with next patch version
-  v-and-r -v -mi             # View current versions with next minor version
-  v-and-r -v -ma             # View current versions with next major version
-  v-and-r -p                 # Increment patch version
-  v-and-r --patch            # Increment patch version
-  v-and-r -mi                # Increment minor version
-  v-and-r --minor            # Increment minor version
-  v-and-r -ma                # Increment major version
-  v-and-r --major            # Increment major version
-  v-and-r -r                 # Generate release information
-  v-and-r --release-info     # Generate release information
-  v-and-r -rd v1.0.0 v1.1.0  # Show commits between tags
-  v-and-r --release-diff v1.0.0 v1.1.0  # Show commits between tags
-  v-and-r -rd v1.0.0         # Show commits from tag to HEAD
-  v-and-r --release-diff v1.0.0  # Show commits from tag to HEAD
-  v-and-r -rl                # Show commits since last tag
-  v-and-r --release-last     # Show commits since last tag
-  v-and-r -rp                # Prepare release documentation
-  v-and-r --release-prepare  # Prepare release documentation
-  v-and-r --release-deploy   # Create git tag for current version
-  v-and-r --release-deploy -m "Release v1.2.3"  # Create annotated git tag
+  grtp --init             # Create default .grtp.json configuration file
+  grtp                    # View current versions with next patch version (default)
+  grtp -v                 # View current versions with next patch version
+  grtp --view             # View current versions with next patch version
+  grtp -v --git           # View current versions with git information
+  grtp -v -p              # View current versions with next patch version
+  grtp -v -mi             # View current versions with next minor version
+  grtp -v -ma             # View current versions with next major version
+  grtp -p                 # Increment patch version
+  grtp --patch            # Increment patch version
+  grtp -mi                # Increment minor version
+  grtp --minor            # Increment minor version
+  grtp -ma                # Increment major version
+  grtp --major            # Increment major version
+  grtp -r                 # Generate release information
+  grtp --release-info     # Generate release information
+  grtp -rd v1.0.0 v1.1.0  # Show commits between tags
+  grtp --release-diff v1.0.0 v1.1.0  # Show commits between tags
+  grtp -rd v1.0.0         # Show commits from tag to HEAD
+  grtp --release-diff v1.0.0  # Show commits from tag to HEAD
+  grtp -rl                # Show commits since last tag
+  grtp --release-last     # Show commits since last tag
+  grtp -rp                # Prepare release documentation
+  grtp --release-prepare  # Prepare release documentation
+  grtp --release-deploy   # Create git tag for current version
+  grtp --release-deploy -m "Release v1.2.3"  # Create annotated git tag
 
 Configuration:
-  The tool uses .v-and-r.json configuration file if present in the current directory,
+  The tool uses .grtp.json configuration file if present in the current directory,
   otherwise falls back to embedded VERSION_FILES configuration.
-  Use 'v-and-r --init' to create a default configuration file.
+  Use 'grtp --init' to create a default configuration file.
   Modify the configuration to customize file patterns, regex patterns,
   and templates for your project structure.
             """
@@ -1316,7 +1316,7 @@ Configuration:
         command_group.add_argument(
             '--init',
             action='store_true',
-            help='Create a default .v-and-r.json configuration file in the current directory'
+            help='Create a default .grtp.json configuration file in the current directory'
         )
         
         # View command (default)
@@ -1469,7 +1469,7 @@ Configuration:
         Returns:
             Exit code (0 for success, non-zero for failure)
         """
-        logger = logging.getLogger('v-and-r')
+        logger = logging.getLogger('grtp')
         
         # Determine increment type for view or action
         increment_type = None
@@ -1536,12 +1536,12 @@ Configuration:
     
     def _execute_init_command(self) -> int:
         """
-        Execute init command to create a default .v-and-r.json configuration file.
+        Execute init command to create a default .grtp.json configuration file.
         
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        logger = logging.getLogger('v-and-r')
+        logger = logging.getLogger('grtp')
         logger.debug("Executing init command")
         
         config_path = os.path.join('.', self.config_manager.CONFIG_FILENAME)
@@ -1565,7 +1565,7 @@ Configuration:
             print("  - Python files with version variables")
             print()
             print("Edit the configuration file to customize patterns for your project.")
-            print("Run 'v-and-r --view' to test your configuration.")
+            print("Run 'grtp --view' to test your configuration.")
             
             return 0
             
@@ -1585,10 +1585,10 @@ Configuration:
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        logger = logging.getLogger('v-and-r')
+        logger = logging.getLogger('grtp')
         logger.debug("Executing view command")
         
-        print("v-and-r (Version and Release Manager)")
+        print("grtp - Grey Red Teal Purple (ATDD/TDD Process Automation)")
         print("=" * 50)
         print("Current versions across configured files:")
         print()
@@ -1655,7 +1655,7 @@ Configuration:
         Display git information including last tag and commits since last tag.
         This method gracefully handles cases where git is not available or no tags exist.
         """
-        logger = logging.getLogger('v-and-r')
+        logger = logging.getLogger('grtp')
         
         # Check if we're in a git repository
         if not self.git_manager.is_git_repository():
@@ -1773,7 +1773,7 @@ Configuration:
         Display git working directory status including modified and untracked files.
         This method gracefully handles cases where git status cannot be retrieved.
         """
-        logger = logging.getLogger('v-and-r')
+        logger = logging.getLogger('grtp')
         
         try:
             status = self.git_manager.get_git_status()
@@ -1850,7 +1850,7 @@ Configuration:
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        print(f"v-and-r: Incrementing {increment_type} version")
+        print(f"grtp: Incrementing {increment_type} version")
         print("=" * 50)
         
         try:
@@ -2027,7 +2027,7 @@ Configuration:
             ReleaseInfo object with version, timestamp, commit hash, and commits
             
         Raises:
-            VAndRError: If unable to determine current version or generate release info
+            GrtpError: If unable to determine current version or generate release info
         """
         import datetime
         
@@ -2035,11 +2035,11 @@ Configuration:
         try:
             versions_found = self.file_manager.find_versions_in_files()
             if not versions_found:
-                raise VAndRError("No versions found in configured files")
+                raise GrtpError("No versions found in configured files")
             
             current_version = self.version_manager.find_highest_version(list(versions_found.values()))
         except (FileError, VersionError) as e:
-            raise VAndRError(f"Cannot determine current version: {e}")
+            raise GrtpError(f"Cannot determine current version: {e}")
         
         # Generate timestamp
         timestamp = datetime.datetime.now().isoformat()
@@ -2630,7 +2630,7 @@ This document contains release notes and highlights for each version.
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        print("v-and-r: Generating release information")
+        print("grtp: Generating release information")
         print("=" * 50)
         
         try:
@@ -2661,7 +2661,7 @@ This document contains release notes and highlights for each version.
             
             return 0
             
-        except (VAndRError, VersionError, FileError, GitError) as e:
+        except (GrtpError, VersionError, FileError, GitError) as e:
             print(f"Error generating release info: {e}")
             return 1
         except Exception as e:
@@ -2680,9 +2680,9 @@ This document contains release notes and highlights for each version.
             Exit code (0 for success, 1 for failure)
         """
         if tag2 is None:
-            print(f"v-and-r: Commits from {tag1} to HEAD")
+            print(f"grtp: Commits from {tag1} to HEAD")
         else:
-            print(f"v-and-r: Commits between {tag1} and {tag2}")
+            print(f"grtp: Commits between {tag1} and {tag2}")
         print("=" * 50)
         
         try:
@@ -2772,7 +2772,7 @@ This document contains release notes and highlights for each version.
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        print("v-and-r: Commits since last release")
+        print("grtp: Commits since last release")
         print("=" * 50)
         
         try:
@@ -2845,7 +2845,7 @@ This document contains release notes and highlights for each version.
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        print("v-and-r: Preparing release documentation")
+        print("grtp: Preparing release documentation")
         print("=" * 50)
         
         try:
@@ -2875,7 +2875,7 @@ This document contains release notes and highlights for each version.
             
             return 0
             
-        except (VAndRError, FileError, GitError) as e:
+        except (GrtpError, FileError, GitError) as e:
             print(f"Error preparing release: {e}")
             return 1
         except Exception as e:
@@ -2892,7 +2892,7 @@ This document contains release notes and highlights for each version.
         Returns:
             Exit code (0 for success, 1 for failure)
         """
-        print("v-and-r: Deploying release with git tag")
+        print("grtp: Deploying release with git tag")
         print("=" * 50)
         
         try:
@@ -2971,7 +2971,7 @@ This document contains release notes and highlights for each version.
                 print(f"✗ Failed to create git tag '{current_version}'")
                 return 1
                 
-        except (VAndRError, FileError, GitError) as e:
+        except (GrtpError, FileError, GitError) as e:
             print(f"Error during release deployment: {e}")
             return 1
         except Exception as e:
@@ -2998,8 +2998,8 @@ def setup_logging(debug: bool = False) -> None:
         ]
     )
     
-    # Create logger for v-and-r
-    logger = logging.getLogger('v-and-r')
+    # Create logger for grtp
+    logger = logging.getLogger('grtp')
     logger.setLevel(log_level)
     
     if debug:
@@ -3014,47 +3014,47 @@ def validate_version_files_config(config: List[Dict]) -> None:
         config: VERSION_FILES configuration list
         
     Raises:
-        VAndRError: If configuration is invalid
+        GrtpError: If configuration is invalid
     """
-    logger = logging.getLogger('v-and-r')
+    logger = logging.getLogger('grtp')
     logger.debug("Validating VERSION_FILES configuration")
     
     if not config:
-        raise VAndRError("VERSION_FILES configuration is empty. Please define at least one file pattern.")
+        raise GrtpError("VERSION_FILES configuration is empty. Please define at least one file pattern.")
     
     if not isinstance(config, list):
-        raise VAndRError("VERSION_FILES must be a list of configuration dictionaries.")
+        raise GrtpError("VERSION_FILES must be a list of configuration dictionaries.")
     
     required_keys = ['file', 'pattern', 'template']
     
     for i, entry in enumerate(config):
         if not isinstance(entry, dict):
-            raise VAndRError(f"VERSION_FILES entry {i} must be a dictionary, got {type(entry)}")
+            raise GrtpError(f"VERSION_FILES entry {i} must be a dictionary, got {type(entry)}")
         
         # Check required keys
         for key in required_keys:
             if key not in entry:
-                raise VAndRError(f"VERSION_FILES entry {i} missing required key: '{key}'")
+                raise GrtpError(f"VERSION_FILES entry {i} missing required key: '{key}'")
         
         # Validate file pattern
         if not isinstance(entry['file'], str) or not entry['file'].strip():
-            raise VAndRError(f"VERSION_FILES entry {i}: 'file' must be a non-empty string")
+            raise GrtpError(f"VERSION_FILES entry {i}: 'file' must be a non-empty string")
         
         # Validate regex pattern
         if not isinstance(entry['pattern'], re.Pattern):
-            raise VAndRError(f"VERSION_FILES entry {i}: 'pattern' must be a compiled regex Pattern object")
+            raise GrtpError(f"VERSION_FILES entry {i}: 'pattern' must be a compiled regex Pattern object")
         
         # Check that regex has at least one capture group
         if entry['pattern'].groups < 1:
-            raise VAndRError(f"VERSION_FILES entry {i}: regex pattern must have at least one capture group to extract version")
+            raise GrtpError(f"VERSION_FILES entry {i}: regex pattern must have at least one capture group to extract version")
         
         # Validate template
         if not isinstance(entry['template'], str) or not entry['template'].strip():
-            raise VAndRError(f"VERSION_FILES entry {i}: 'template' must be a non-empty string")
+            raise GrtpError(f"VERSION_FILES entry {i}: 'template' must be a non-empty string")
         
         # Check that template contains version placeholder
         if '{version}' not in entry['template']:
-            raise VAndRError(f"VERSION_FILES entry {i}: template must contain '{{version}}' placeholder")
+            raise GrtpError(f"VERSION_FILES entry {i}: template must contain '{{version}}' placeholder")
         
         logger.debug(f"Validated config entry {i}: file='{entry['file']}', template='{entry['template']}'")
     
@@ -3071,7 +3071,7 @@ def execute_command(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
-    logger = logging.getLogger('v-and-r')
+    logger = logging.getLogger('grtp')
     
     try:
         # Initialize CLI interface (configuration validation happens in __init__)
@@ -3082,7 +3082,7 @@ def execute_command(args: argparse.Namespace) -> int:
         logger.info(f"Executing command with args: {args}")
         return cli.execute_command(args)
         
-    except VAndRError as e:
+    except GrtpError as e:
         logger.error(f"Configuration error: {e}")
         print(f"Configuration Error: {e}", file=sys.stderr)
         print("\nPlease check your VERSION_FILES configuration and try again.", file=sys.stderr)
@@ -3123,7 +3123,7 @@ def execute_command(args: argparse.Namespace) -> int:
 
 def main():
     """
-    Main entry point for the v-and-r tool with comprehensive error handling and logging.
+    Main entry point for the grtp tool with comprehensive error handling and logging.
     
     This function orchestrates CLI parsing, command execution, and provides user-friendly
     error messages for different types of failures.
@@ -3133,9 +3133,9 @@ def main():
     
     # Set up logging
     setup_logging(debug=debug_mode)
-    logger = logging.getLogger('v-and-r')
+    logger = logging.getLogger('grtp')
     
-    logger.info("Starting v-and-r (Version and Release Manager)")
+    logger.info("Starting grtp - Grey Red Teal Purple (ATDD/TDD Process Automation)")
     logger.debug(f"Command line arguments: {sys.argv}")
     logger.debug(f"Python version: {sys.version}")
     logger.debug(f"Working directory: {os.getcwd()}")
@@ -3196,15 +3196,15 @@ def test_main_execution_flow():
         # Test empty configuration
         try:
             validate_version_files_config([])
-            assert False, "Should raise VAndRError for empty config"
-        except VAndRError as e:
+            assert False, "Should raise GrtpError for empty config"
+        except GrtpError as e:
             assert "empty" in str(e).lower()
         
         # Test invalid configuration (missing keys)
         try:
             validate_version_files_config([{'file': 'test.py'}])
-            assert False, "Should raise VAndRError for missing keys"
-        except VAndRError as e:
+            assert False, "Should raise GrtpError for missing keys"
+        except GrtpError as e:
             assert "missing required key" in str(e).lower()
         
         # Test invalid regex pattern
@@ -3214,8 +3214,8 @@ def test_main_execution_flow():
                 'pattern': 'not-a-regex-object',
                 'template': 'version = "{version}"'
             }])
-            assert False, "Should raise VAndRError for invalid pattern"
-        except VAndRError as e:
+            assert False, "Should raise GrtpError for invalid pattern"
+        except GrtpError as e:
             assert "compiled regex" in str(e).lower()
         
         # Test valid configuration
@@ -3230,17 +3230,17 @@ def test_main_execution_flow():
     def test_logging_setup():
         # Test debug logging setup
         setup_logging(debug=True)
-        logger = logging.getLogger('v-and-r')
+        logger = logging.getLogger('grtp')
         assert logger.level == logging.DEBUG
         
         # Test normal logging setup
         setup_logging(debug=False)
-        logger = logging.getLogger('v-and-r')
+        logger = logging.getLogger('grtp')
         assert logger.level == logging.INFO
     
     # Test main execution with mocked arguments
     def test_main_execution_with_mocked_args():
-        with mock.patch('sys.argv', ['v-and-r', '--view']):
+        with mock.patch('sys.argv', ['grtp', '--view']):
             with mock.patch.object(CLIInterface, 'execute_command', return_value=0) as mock_execute:
                 exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
                 assert exit_code == 0
@@ -3248,8 +3248,8 @@ def test_main_execution_flow():
     
     # Test error handling in execute_command
     def test_execute_command_error_handling():
-        # Test VAndRError handling - need to mock the CLI creation to raise the error
-        with mock.patch('__main__.CLIInterface', side_effect=VAndRError("Test error")):
+        # Test GrtpError handling - need to mock the CLI creation to raise the error
+        with mock.patch('__main__.CLIInterface', side_effect=GrtpError("Test error")):
             exit_code = execute_command(argparse.Namespace(view=True, debug=False, release_deploy=False))
             assert exit_code == 2
         
@@ -3328,79 +3328,79 @@ def test_cli_interface():
         cli = CLIInterface()
         
         # Test default behavior (no arguments should default to view)
-        with mock.patch('sys.argv', ['v-and-r']):
+        with mock.patch('sys.argv', ['grtp']):
             args = cli.parse_arguments()
             assert args.view == True
         
         # Test view command
-        with mock.patch('sys.argv', ['v-and-r', '-v']):
+        with mock.patch('sys.argv', ['grtp', '-v']):
             args = cli.parse_arguments()
             assert args.view == True
         
-        with mock.patch('sys.argv', ['v-and-r', '--view']):
+        with mock.patch('sys.argv', ['grtp', '--view']):
             args = cli.parse_arguments()
             assert args.view == True
         
         # Test patch command
-        with mock.patch('sys.argv', ['v-and-r', '-p']):
+        with mock.patch('sys.argv', ['grtp', '-p']):
             args = cli.parse_arguments()
             assert args.patch == True
         
-        with mock.patch('sys.argv', ['v-and-r', '--patch']):
+        with mock.patch('sys.argv', ['grtp', '--patch']):
             args = cli.parse_arguments()
             assert args.patch == True
         
         # Test minor command
-        with mock.patch('sys.argv', ['v-and-r', '-mi']):
+        with mock.patch('sys.argv', ['grtp', '-mi']):
             args = cli.parse_arguments()
             assert args.minor == True
         
-        with mock.patch('sys.argv', ['v-and-r', '--minor']):
+        with mock.patch('sys.argv', ['grtp', '--minor']):
             args = cli.parse_arguments()
             assert args.minor == True
         
         # Test major command
-        with mock.patch('sys.argv', ['v-and-r', '-ma']):
+        with mock.patch('sys.argv', ['grtp', '-ma']):
             args = cli.parse_arguments()
             assert args.major == True
         
-        with mock.patch('sys.argv', ['v-and-r', '--major']):
+        with mock.patch('sys.argv', ['grtp', '--major']):
             args = cli.parse_arguments()
             assert args.major == True
         
         # Test release info command
-        with mock.patch('sys.argv', ['v-and-r', '-r']):
+        with mock.patch('sys.argv', ['grtp', '-r']):
             args = cli.parse_arguments()
             assert args.release_info == True
         
-        with mock.patch('sys.argv', ['v-and-r', '--release-info']):
+        with mock.patch('sys.argv', ['grtp', '--release-info']):
             args = cli.parse_arguments()
             assert args.release_info == True
         
         # Test release diff command
-        with mock.patch('sys.argv', ['v-and-r', '-rd', 'v1.0.0', 'v1.1.0']):
+        with mock.patch('sys.argv', ['grtp', '-rd', 'v1.0.0', 'v1.1.0']):
             args = cli.parse_arguments()
             assert args.release_diff == ['v1.0.0', 'v1.1.0']
         
-        with mock.patch('sys.argv', ['v-and-r', '--release-diff', 'v1.0.0', 'v1.1.0']):
+        with mock.patch('sys.argv', ['grtp', '--release-diff', 'v1.0.0', 'v1.1.0']):
             args = cli.parse_arguments()
             assert args.release_diff == ['v1.0.0', 'v1.1.0']
         
         # Test release last command
-        with mock.patch('sys.argv', ['v-and-r', '-rl']):
+        with mock.patch('sys.argv', ['grtp', '-rl']):
             args = cli.parse_arguments()
             assert args.release_last == True
         
-        with mock.patch('sys.argv', ['v-and-r', '--release-last']):
+        with mock.patch('sys.argv', ['grtp', '--release-last']):
             args = cli.parse_arguments()
             assert args.release_last == True
         
         # Test release prepare command
-        with mock.patch('sys.argv', ['v-and-r', '-rp']):
+        with mock.patch('sys.argv', ['grtp', '-rp']):
             args = cli.parse_arguments()
             assert args.release_prepare == True
         
-        with mock.patch('sys.argv', ['v-and-r', '--release-prepare']):
+        with mock.patch('sys.argv', ['grtp', '--release-prepare']):
             args = cli.parse_arguments()
             assert args.release_prepare == True
     
@@ -3408,7 +3408,7 @@ def test_cli_interface():
         cli = CLIInterface()
         
         # Test release-diff with same tags (should exit with error)
-        with mock.patch('sys.argv', ['v-and-r', '-rd', 'v1.0.0', 'v1.0.0']):
+        with mock.patch('sys.argv', ['grtp', '-rd', 'v1.0.0', 'v1.0.0']):
             with mock.patch('sys.exit') as mock_exit:
                 cli.parse_arguments()
                 mock_exit.assert_called_with(1)
@@ -3964,7 +3964,7 @@ def test_cli_interface():
                             mock_releases.assert_called_once_with(mock_release_info)
         
         # Test error during release info generation
-        with mock.patch.object(cli, 'generate_release_info', side_effect=VAndRError("Cannot determine version")):
+        with mock.patch.object(cli, 'generate_release_info', side_effect=GrtpError("Cannot determine version")):
             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                 result = cli._execute_release_prepare_command()
                 assert result == 1
@@ -5297,7 +5297,7 @@ def test_git_manager():
 if __name__ == "__main__":
     # Check if running tests
     if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        print("Running all unit tests for v-and-r...")
+        print("Running all unit tests for grtp...")
         print("=" * 60)
         
         main_success = test_main_execution_flow()

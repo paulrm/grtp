@@ -2,7 +2,7 @@
 
 ## Welcome Contributors!
 
-Thank you for your interest in contributing to v-and-r! This guide will help you get started with contributing to the project.
+Thank you for your interest in contributing to grtp! This guide will help you get started with contributing to the project.
 
 ## Getting Started
 
@@ -18,11 +18,11 @@ Thank you for your interest in contributing to v-and-r! This guide will help you
 1. **Fork and Clone**
    ```bash
    # Fork the repository on GitHub, then clone your fork
-   git clone https://github.com/YOUR-USERNAME/v-and-r.git
-   cd v-and-r
+   git clone https://github.com/YOUR-USERNAME/grtp.git
+   cd grtp
    
    # Add upstream remote
-   git remote add upstream https://github.com/ORIGINAL-OWNER/v-and-r.git
+   git remote add upstream https://github.com/ORIGINAL-OWNER/grtp.git
    ```
 
 2. **Set up Development Environment**
@@ -32,17 +32,17 @@ Thank you for your interest in contributing to v-and-r! This guide will help you
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    
    # Install development dependencies (if any)
-   # Currently, v-and-r uses only standard library modules
+   # Currently, grtp uses only standard library modules
    
    # Make the script executable
-   chmod +x v-and-r.py
+   chmod +x grtp.py
    ```
 
 3. **Verify Setup**
    ```bash
    # Test the tool
-   python v-and-r.py --help
-   python v-and-r.py --test  # Run built-in tests
+   python grtp.py --help
+   python grtp.py --test  # Run built-in tests
    ```
 
 ## Development Workflow
@@ -70,11 +70,11 @@ Thank you for your interest in contributing to v-and-r! This guide will help you
 3. **Test Your Changes**
    ```bash
    # Run built-in tests
-   python v-and-r.py --test
+   python grtp.py --test
    
    # Test manually with different scenarios
-   python v-and-r.py --view
-   python v-and-r.py --patch
+   python grtp.py --view
+   python grtp.py --patch
    ```
 
 4. **Commit Your Changes**
@@ -264,7 +264,7 @@ For feature requests, please include:
 #### Feature Ideas
 
 - [ ] `--dry-run` flag for testing changes
-- [ ] External configuration files (.v-and-r.json)
+- [ ] External configuration files (.grtp.json)
 - [ ] Plugin system for custom strategies
 - [ ] Web interface for release management
 - [ ] Support for pre-release versions
@@ -294,7 +294,7 @@ For feature requests, please include:
 
 2. **Run Tests**
    ```bash
-   python v-and-r.py --test
+   python grtp.py --test
    ```
 
 3. **Update Documentation**
@@ -357,16 +357,16 @@ cd test-project
 echo '# Test Project\n- Version v1.0.0' > README.md
 echo 'version = "v1.0.0"' > app.py
 
-# Test v-and-r
-python ../v-and-r.py --view
-python ../v-and-r.py --patch
+# Test grtp
+python ../grtp.py --view
+python ../grtp.py --patch
 ```
 
 ### Debugging
 
 ```bash
 # Enable debug mode
-python v-and-r.py --debug --view
+python grtp.py --debug --view
 
 # Test specific components
 python -c "
@@ -384,10 +384,10 @@ print(vm.parse_version('v1.2.3'))
 # Test with large repositories
 git clone https://github.com/large-repo/example.git
 cd example
-python ../v-and-r.py --view
+python ../grtp.py --view
 
 # Time operations
-time python v-and-r.py --release-last
+time python grtp.py --release-last
 ```
 
 ## Community Guidelines
@@ -418,17 +418,17 @@ time python v-and-r.py --release-last
 
 1. **Version Increment**
    ```bash
-   python v-and-r.py --minor  # or --patch, --major
+   python grtp.py --minor  # or --patch, --major
    ```
 
 2. **Update Documentation**
    ```bash
-   python v-and-r.py --release-prepare
+   python grtp.py --release-prepare
    ```
 
 3. **Create Release**
    ```bash
-   python v-and-r.py --release-deploy -m "Release v1.2.0"
+   python grtp.py --release-deploy -m "Release v1.2.0"
    ```
 
 4. **Publish**
@@ -451,4 +451,4 @@ Contributors will be recognized in:
 - Release notes
 - Special thanks in major releases
 
-Thank you for contributing to v-and-r! 🚀
+Thank you for contributing to grtp! 🚀

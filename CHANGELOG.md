@@ -1,4 +1,21 @@
 # Changelog
+## [1.3.0] - 2025-10-25
+### Other
+- v1.3.0 renamed grpt (3d9b4f3)
+- 📚 Updated tool documentation and added git information flag (40d53f5)
+- 🚀 Added external config (04c9eff)
+- 🔧 Fixed prefix 'v' issue in version manager and updated version to v0.2.3 (fc1f615)
+- 🔧 Update version to v0.2.2 across all projects, add known bugs section to README, extend versioning patterns for specific files (b3e8d5f)
+
+### Commits
+```
+3d9b4f3 v1.3.0 renamed grpt                                         	paulrm	2025-10-25
+40d53f5 📚 Updated tool documentation and added git information flag 	paulrm	2025-10-09
+04c9eff 🚀 Added external config                                     	paulrm	2025-10-09
+fc1f615 🔧 Fixed prefix 'v' issue in version manager and updated version to v0.2.3	paulrm	2025-09-27
+b3e8d5f 🔧 Update version to v0.2.2 across all projects, add known bugs section to README, extend versioning patterns for specific files	paulrm	2025-09-26
+```
+
 ## [v0.1.1] - 2025-09-26
 ### Other
 - 🔧 added --release-deploy (643d235)

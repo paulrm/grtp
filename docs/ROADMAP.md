@@ -1,8 +1,8 @@
-# 🗺️ v-and-r Roadmap
+# 🗺️ grtp Roadmap
 
 ## Current Status
 
-v-and-r is actively developed with a focus on stability, usability, and comprehensive version management features. The tool has evolved from a simple version incrementer to a full-featured release management system.
+grtp is actively developed with a focus on stability, usability, and comprehensive version management features. The tool has evolved from a simple version incrementer to a full-featured release management system.
 
 ## ✅ Completed Features
 
@@ -70,7 +70,7 @@ v-and-r is actively developed with a focus on stability, usability, and comprehe
 ### Medium Priority Features
 
 #### External Configuration
-- [ ] **Configuration Files**: Support for `.v-and-r.json` and `.v-and-r.yaml`
+- [ ] **Configuration Files**: Support for `.grtp.json` and `.grtp.yaml`
 - [ ] **Environment-specific Configs**: Different configs for dev/staging/prod
 - [ ] **Configuration Validation**: Schema validation for external configs
 - [ ] **Configuration Migration**: Tools to migrate embedded config to external files
@@ -228,7 +228,7 @@ v-and-r is actively developed with a focus on stability, usability, and comprehe
 ## 📊 Success Metrics
 
 ### Adoption Metrics
-- **Active Users**: Number of projects using v-and-r
+- **Active Users**: Number of projects using grtp
 - **Feature Usage**: Most/least used features and commands
 - **Error Rates**: Frequency and types of errors encountered
 - **Performance**: Execution time for common operations

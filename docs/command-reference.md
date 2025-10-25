@@ -2,12 +2,12 @@
 
 ## Overview
 
-v-and-r provides a comprehensive command-line interface for version management and release operations.
+grtp provides a comprehensive command-line interface for version management and release operations.
 
 ## Command Syntax
 
 ```bash
-python v-and-r.py [COMMAND] [OPTIONS]
+python grtp.py [COMMAND] [OPTIONS]
 ```
 
 ## Commands
@@ -18,13 +18,13 @@ python v-and-r.py [COMMAND] [OPTIONS]
 Show current versions, next patch version, git history, and working directory status (default behavior).
 
 ```bash
-python v-and-r.py --view
-python v-and-r.py -v
+python grtp.py --view
+python grtp.py -v
 
 # With next version preview
-python v-and-r.py --view --patch    # Next patch version (default)
-python v-and-r.py --view --minor    # Next minor version
-python v-and-r.py --view --major    # Next major version
+python grtp.py --view --patch    # Next patch version (default)
+python grtp.py --view --minor    # Next minor version
+python grtp.py --view --major    # Next major version
 ```
 
 **Output includes:**
@@ -41,24 +41,24 @@ python v-and-r.py --view --major    # Next major version
 Increment patch version (e.g., v1.2.3 → v1.2.4) for bug fixes.
 
 ```bash
-python v-and-r.py --patch
-python v-and-r.py -p
+python grtp.py --patch
+python grtp.py -p
 ```
 
 #### `--minor` / `-mi`
 Increment minor version and reset patch (e.g., v1.2.3 → v1.3.0) for new features.
 
 ```bash
-python v-and-r.py --minor
-python v-and-r.py -mi
+python grtp.py --minor
+python grtp.py -mi
 ```
 
 #### `--major` / `-ma`
 Increment major version and reset minor/patch (e.g., v1.2.3 → v2.0.0) for breaking changes.
 
 ```bash
-python v-and-r.py --major
-python v-and-r.py -ma
+python grtp.py --major
+python grtp.py -ma
 ```
 
 ### Release Management Commands
@@ -67,8 +67,8 @@ python v-and-r.py -ma
 Generate release information and version.json file.
 
 ```bash
-python v-and-r.py --release-info
-python v-and-r.py -r
+python grtp.py --release-info
+python grtp.py -r
 ```
 
 **Generates:**
@@ -81,28 +81,28 @@ Show commits between two git tags or from tag to HEAD.
 
 ```bash
 # Between two tags
-python v-and-r.py --release-diff v1.0.0 v1.1.0
-python v-and-r.py -rd v1.0.0 v1.1.0
+python grtp.py --release-diff v1.0.0 v1.1.0
+python grtp.py -rd v1.0.0 v1.1.0
 
 # From tag to HEAD
-python v-and-r.py --release-diff v1.0.0
-python v-and-r.py -rd v1.0.0
+python grtp.py --release-diff v1.0.0
+python grtp.py -rd v1.0.0
 ```
 
 #### `--release-last` / `-rl`
 Show commits since the last git tag.
 
 ```bash
-python v-and-r.py --release-last
-python v-and-r.py -rl
+python grtp.py --release-last
+python grtp.py -rl
 ```
 
 #### `--release-prepare` / `-rp`
 Prepare release by updating version.json, CHANGELOG.md, and RELEASES.md.
 
 ```bash
-python v-and-r.py --release-prepare
-python v-and-r.py -rp
+python grtp.py --release-prepare
+python grtp.py -rp
 ```
 
 **Updates:**
@@ -115,10 +115,10 @@ Create git tag for current version to deploy release.
 
 ```bash
 # Create lightweight tag
-python v-and-r.py --release-deploy
+python grtp.py --release-deploy
 
 # Create annotated tag with message
-python v-and-r.py --release-deploy -m "Release v1.2.3 with new features"
+python grtp.py --release-deploy -m "Release v1.2.3 with new features"
 ```
 
 ### Options
@@ -127,21 +127,21 @@ python v-and-r.py --release-deploy -m "Release v1.2.3 with new features"
 Specify release message for annotated git tag (used with --release-deploy).
 
 ```bash
-python v-and-r.py --release-deploy -m "Major release with breaking changes"
+python grtp.py --release-deploy -m "Major release with breaking changes"
 ```
 
 #### `-d` / `--debug`
 Enable debug logging for troubleshooting.
 
 ```bash
-python v-and-r.py --debug --view
+python grtp.py --debug --view
 ```
 
 #### `-h` / `--help`
 Display help information and usage examples.
 
 ```bash
-python v-and-r.py --help
+python grtp.py --help
 ```
 
 ## Command Combinations
@@ -150,25 +150,25 @@ python v-and-r.py --help
 
 ```bash
 # Default: shows next patch version
-python v-and-r.py
+python grtp.py
 
 # Explicit patch version preview
-python v-and-r.py --view --patch
+python grtp.py --view --patch
 
 # Minor version preview
-python v-and-r.py --view --minor
+python grtp.py --view --minor
 
 # Major version preview
-python v-and-r.py --view --major
+python grtp.py --view --major
 ```
 
 ### Release Workflow Commands
 
 ```bash
 # Complete release workflow
-python v-and-r.py --patch                    # 1. Increment version
-python v-and-r.py --release-prepare          # 2. Update documentation
-python v-and-r.py --release-deploy -m "Bug fix release"  # 3. Create tag
+python grtp.py --patch                    # 1. Increment version
+python grtp.py --release-prepare          # 2. Update documentation
+python grtp.py --release-deploy -m "Bug fix release"  # 3. Create tag
 ```
 
 ## Exit Codes
@@ -197,19 +197,19 @@ These commands cannot be used together:
 
 ```bash
 # Error: Multiple increment types
-python v-and-r.py --patch --minor
+python grtp.py --patch --minor
 # Error: Only one increment type (-p, -mi, -ma) can be specified at a time
 
 # Error: Message without deploy
-python v-and-r.py --release-info -m "message"
+python grtp.py --release-info -m "message"
 # Error: -m/--message option can only be used with --release-deploy
 
 # Error: Invalid tag arguments
-python v-and-r.py --release-diff
+python grtp.py --release-diff
 # Error: TAG must be provided for --release-diff
 
 # Error: Same tags
-python v-and-r.py --release-diff v1.0.0 v1.0.0
+python grtp.py --release-diff v1.0.0 v1.0.0
 # Error: TAG1 and TAG2 cannot be the same for --release-diff
 ```
 
@@ -219,39 +219,39 @@ python v-and-r.py --release-diff v1.0.0 v1.0.0
 
 ```bash
 # Daily development
-python v-and-r.py                           # Check status
-python v-and-r.py --release-last            # See recent changes
+python grtp.py                           # Check status
+python grtp.py --release-last            # See recent changes
 
 # Bug fix
-python v-and-r.py --patch                   # Increment patch
-python v-and-r.py --release-deploy          # Deploy fix
+python grtp.py --patch                   # Increment patch
+python grtp.py --release-deploy          # Deploy fix
 
 # Feature development
-python v-and-r.py --view --minor            # Preview next minor
-python v-and-r.py --minor                   # Increment minor
-python v-and-r.py --release-prepare         # Update docs
+python grtp.py --view --minor            # Preview next minor
+python grtp.py --minor                   # Increment minor
+python grtp.py --release-prepare         # Update docs
 ```
 
 ### Release Management
 
 ```bash
 # Release preparation
-python v-and-r.py --release-info            # Generate release info
-python v-and-r.py --release-diff v1.0.0     # Review changes
-python v-and-r.py --release-prepare         # Update documentation
+python grtp.py --release-info            # Generate release info
+python grtp.py --release-diff v1.0.0     # Review changes
+python grtp.py --release-prepare         # Update documentation
 
 # Release deployment
-python v-and-r.py --release-deploy -m "Release v1.1.0"
+python grtp.py --release-deploy -m "Release v1.1.0"
 ```
 
 ### Debugging and Troubleshooting
 
 ```bash
 # Debug mode
-python v-and-r.py --debug --view            # Verbose output
-python v-and-r.py --debug --patch           # Debug version increment
+python grtp.py --debug --view            # Verbose output
+python grtp.py --debug --patch           # Debug version increment
 
 # Check configuration
-python v-and-r.py --view                    # Verify patterns match
-python v-and-r.py --help                    # Review usage
+python grtp.py --view                    # Verify patterns match
+python grtp.py --help                    # Review usage
 ```

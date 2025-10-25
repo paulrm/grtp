@@ -1,6 +1,6 @@
-# v-and-r Documentation
+# grtp Documentation
 
-Welcome to the comprehensive documentation for v-and-r (Version and Release Manager).
+Welcome to the comprehensive documentation for grtp (Grey Red Teal Purple (ATDD/TDD Process Automation)).
 
 ## 📚 Documentation Structure
 
@@ -23,7 +23,7 @@ Welcome to the comprehensive documentation for v-and-r (Version and Release Mana
 
 ## 📖 Overview
 
-v-and-r is a command-line tool that automates version management and release processes across multiple project files. It follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
+grtp is a command-line tool that automates version management and release processes across multiple project files. It follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 
 ### ✨ Key Features
 

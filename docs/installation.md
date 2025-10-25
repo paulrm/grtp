@@ -2,17 +2,17 @@
 
 ## Quick Installation
 
-Simply download the `v-and-r.py` script and make it executable:
+Simply download the `grtp.py` script and make it executable:
 
 ```bash
 # Download the script
-curl -O https://raw.githubusercontent.com/your-repo/v-and-r.py
+curl -O https://raw.githubusercontent.com/your-repo/grtp.py
 
 # Make it executable
-chmod +x v-and-r.py
+chmod +x grtp.py
 
 # Optionally, create a symlink for easier access
-ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
+ln -s $(pwd)/grtp.py /usr/local/bin/grtp
 ```
 
 ## Requirements
@@ -40,36 +40,36 @@ No external dependencies are required.
 
 ```bash
 # Download directly
-wget https://raw.githubusercontent.com/your-repo/v-and-r/main/v-and-r.py
+wget https://raw.githubusercontent.com/your-repo/grtp/main/grtp.py
 
 # Or using curl
-curl -O https://raw.githubusercontent.com/your-repo/v-and-r/main/v-and-r.py
+curl -O https://raw.githubusercontent.com/your-repo/grtp/main/grtp.py
 
 # Make executable
-chmod +x v-and-r.py
+chmod +x grtp.py
 ```
 
 ### Method 2: Git Clone
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/v-and-r.git
-cd v-and-r
+git clone https://github.com/your-repo/grtp.git
+cd grtp
 
 # Make executable
-chmod +x v-and-r.py
+chmod +x grtp.py
 
 # Optional: Create system-wide symlink
-sudo ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
+sudo ln -s $(pwd)/grtp.py /usr/local/bin/grtp
 ```
 
 ### Method 3: Package Manager (Future)
 
 ```bash
 # Coming soon
-pip install v-and-r
+pip install grtp
 # or
-brew install v-and-r
+brew install grtp
 ```
 
 ## Quick Start
@@ -78,24 +78,24 @@ After installation, verify the tool works:
 
 ```bash
 # Check help
-python v-and-r.py --help
+python grtp.py --help
 
 # View current project status (if in a project directory)
-python v-and-r.py --view
+python grtp.py --view
 ```
 
 ## System Integration
 
 ### Creating a System Command
 
-To use `v-and-r` as a system command:
+To use `grtp` as a system command:
 
 ```bash
 # Create symlink in PATH
-sudo ln -s $(pwd)/v-and-r.py /usr/local/bin/v-and-r
+sudo ln -s $(pwd)/grtp.py /usr/local/bin/grtp
 
 # Now you can use it anywhere
-v-and-r --help
+grtp --help
 ```
 
 ### Shell Alias
@@ -103,17 +103,17 @@ v-and-r --help
 Add to your shell configuration (`.bashrc`, `.zshrc`, etc.):
 
 ```bash
-alias v-and-r='python /path/to/v-and-r.py'
+alias grtp='python /path/to/grtp.py'
 ```
 
 ### Windows Installation
 
 ```cmd
 # Download using PowerShell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/your-repo/v-and-r/main/v-and-r.py" -OutFile "v-and-r.py"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/your-repo/grtp/main/grtp.py" -OutFile "grtp.py"
 
 # Run with Python
-python v-and-r.py --help
+python grtp.py --help
 ```
 
 ## Verification
@@ -122,13 +122,13 @@ Test your installation:
 
 ```bash
 # Check version and help
-python v-and-r.py --help
+python grtp.py --help
 
 # Test in a sample directory
 mkdir test-project
 cd test-project
 echo '# Test Project\n- Version v1.0.0' > README.md
-python v-and-r.py --view
+python grtp.py --view
 ```
 
 You should see output showing the detected version in README.md.
