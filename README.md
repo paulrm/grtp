@@ -1,6 +1,6 @@
 # grtp - Grey Red Teal Purple
 
-- Version v1.3.0
+- Version v1.3.1
 
 A command-line tool that helps with ATDD/TDD (Acceptance Test-Driven Development / Test-Driven Development) process automation and automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 

@@ -3536,7 +3536,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='y'):  # User confirms
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.0"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.1"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('patch')
                                 assert result == 0
@@ -3568,7 +3568,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', side_effect=FileError("Write failed")):
                     with mock.patch('builtins.input', side_effect=['y', 'y']):  # Confirm update, then rollback
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.0"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.1"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('minor')
                                 assert result == 1
@@ -3590,7 +3590,7 @@ def test_cli_interface():
         
         # Test successful rollback
         original_contents = {
-            'app.py': 'version = "v1.3.0"',
+            'app.py': 'version = "v1.3.1"',
             'config.py': 'VERSION = "v1.2.3"'
         }
         update_results = {
@@ -3627,7 +3627,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='yes'):
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.0"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.1"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('patch')
                                 assert result == 0
@@ -3642,7 +3642,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='y'):
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.0"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.1"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('minor')
                                 assert result == 0
@@ -3656,7 +3656,7 @@ def test_cli_interface():
             with mock.patch.object(cli.file_manager, 'expand_file_patterns', return_value=mock_expanded_files):
                 with mock.patch.object(cli.file_manager, 'update_file_version', return_value=True):
                     with mock.patch('builtins.input', return_value='y'):
-                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.0"')):
+                        with mock.patch('builtins.open', mock.mock_open(read_data='version = "v1.3.1"')):
                             with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
                                 result = cli._execute_increment_command('major')
                                 assert result == 0
@@ -4644,7 +4644,7 @@ def test_file_manager():
             # Create test files with versions
             test_file1 = os.path.join(temp_dir, 'app.py')
             with open(test_file1, 'w') as f:
-                f.write('#!/usr/bin/env python3\nversion = "v1.3.0"\nprint("Hello")')
+                f.write('#!/usr/bin/env python3\nversion = "v1.3.1"\nprint("Hello")')
             
             test_file2 = os.path.join(temp_dir, 'config.py')
             with open(test_file2, 'w') as f:
@@ -4692,7 +4692,7 @@ def test_file_manager():
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create test file with version
             test_file = os.path.join(temp_dir, 'app.py')
-            original_content = '#!/usr/bin/env python3\nversion = "v1.3.0"\nprint("Hello")'
+            original_content = '#!/usr/bin/env python3\nversion = "v1.3.1"\nprint("Hello")'
             with open(test_file, 'w') as f:
                 f.write(original_content)
             
@@ -4719,7 +4719,7 @@ def test_file_manager():
                     updated_content = f.read()
                 
                 assert 'version = "v2.0.0"' in updated_content
-                assert 'version = "v1.3.0"' not in updated_content
+                assert 'version = "v1.3.1"' not in updated_content
                 assert '#!/usr/bin/env python3' in updated_content  # Other content preserved
                 
                 # Test updating file with no version (should return False)
