@@ -2,7 +2,7 @@
 
 ## Overview
 
-The v-and-r (Version and Release Manager) is a Python-based command-line tool that provides automated version management across multiple project files. The tool follows semantic versioning principles (MAJOR.MINOR.PATCH) and integrates with git for comprehensive release management. The design emphasizes simplicity, configurability, and reliability through a single-file implementation with embedded configuration.
+The grtp (Grey Red Teal Purple) is a Python-based command-line tool that provides automated version management across multiple project files. The tool follows semantic versioning principles (MAJOR.MINOR.PATCH) and integrates with git for comprehensive release management. The design emphasizes simplicity, configurability, and reliability through a single-file implementation with embedded configuration.
 
 ## Architecture
 
@@ -249,19 +249,19 @@ class ReleaseInfo:
 ### Error Handling Strategy
 
 ```python
-class VAndRError(Exception):
-    """Base exception for v-and-r tool"""
+class GrtpError(Exception):
+    """Base exception for grtp tool"""
     pass
 
-class VersionError(VAndRError):
+class VersionError(GrtpError):
     """Version-related errors"""
     pass
 
-class FileError(VAndRError):
+class FileError(GrtpError):
     """File operation errors"""
     pass
 
-class GitError(VAndRError):
+class GitError(GrtpError):
     """Git integration errors"""
     pass
 ```
