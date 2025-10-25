@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GRTP – Four Areas in One Line</title>
+  <style>
+    body, html { margin:0; padding:0; height:100%; background:#f0f0f0; font-family:sans-serif; }
+    .container { display:flex; height:100vh; }
+    .area { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#fff; font-weight:bold; font-size:1.5rem; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+    .grey   { background:#9E9E9E; }
+    .red    { background:#D32F2F; }
+    .teal   { background:#00695C; }
+    .purple { background:#6A1B9A; }
+    img { max-width:70%; max-height:60%; object-fit:contain; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Grey -->
+    <div class="area grey">
+      <img src="https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=800&q=80" alt="Napkin">
+      <div>Napkin</div>
+    </div>
+
+    <!-- Red -->
+    <div class="area red">
+      <img src="https://images.unsplash.com/photo-1581092588609-8dd8b975a079?auto=format&fit=crop&w=800&q=80" alt="Working Aware Signal">
+      <div>Working Aware Signal</div>
+    </div>
+
+    <!-- Teal -->
+    <div class="area teal">
+      <img src="https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&w=800&q=80" alt="Teal Duck">
+      <div>Teal Duck</div>
+    </div>
+
+    <!-- Purple -->
+    <div class="area purple">
+      <img src="https://images.unsplash.com/photo-1578662996442-48f60103fcbf?auto=format&fit=crop&w=800&q=80" alt="Deploy Reference Rocket">
+      <div>Deploy Reference – Rocket</div>
+    </div>
+  </div>
+</body>
+</html>
