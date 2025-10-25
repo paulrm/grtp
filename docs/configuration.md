@@ -16,7 +16,7 @@ The tool automatically uses external configuration if available, otherwise falls
 Create a default configuration file:
 
 ```bash
-grtp --init
+grtp init
 ```
 
 This creates `.grtp.json` with default patterns for common file types.

@@ -112,7 +112,7 @@ Summary: 1 changed file, 1 untracked file
 Create a `.grtp.json` configuration file in your project root:
 
 ```bash
-grtp --init  # Creates default .grtp.json
+grtp init  # Creates default .grtp.json
 ```
 
 Edit the generated `.grtp.json` file:

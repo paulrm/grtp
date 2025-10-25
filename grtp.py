@@ -1273,7 +1273,7 @@ class CLIInterface:
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  grtp --init             # Create default .grtp.json configuration file
+  grtp init               # Create default .grtp.json configuration file
   grtp                    # View current versions with next patch version (default)
   grtp -v                 # View current versions with next patch version
   grtp --view             # View current versions with next patch version
@@ -1303,7 +1303,7 @@ Examples:
 Configuration:
   The tool uses .grtp.json configuration file if present in the current directory,
   otherwise falls back to embedded VERSION_FILES configuration.
-  Use 'grtp --init' to create a default configuration file.
+  Use 'grtp init' to create a default configuration file.
   Modify the configuration to customize file patterns, regex patterns,
   and templates for your project structure.
             """
@@ -1312,11 +1312,12 @@ Configuration:
         # Create mutually exclusive group for main commands (excluding increment commands)
         command_group = parser.add_mutually_exclusive_group()
         
-        # Init command
+        # Init command as subcommand
         command_group.add_argument(
-            '--init',
-            action='store_true',
-            help='Create a default .grtp.json configuration file in the current directory'
+            'command',
+            nargs='?',
+            choices=['init'],
+            help='Subcommand to execute (init: create default .grtp.json configuration file)'
         )
         
         # View command (default)
@@ -1452,8 +1453,9 @@ Configuration:
         # If increment flags are used with view, that's allowed for preview
         # If increment flags are used without view, they perform actual increment
         # If no command specified, default to view
+        has_command = hasattr(args, 'command') and args.command is not None
         if not any([
-            args.view, args.patch, args.minor, args.major,
+            has_command, args.view, args.patch, args.minor, args.major,
             args.release_info, args.release_diff, args.release_last,
             args.release_prepare, args.release_deploy
         ]):
@@ -1482,7 +1484,7 @@ Configuration:
         
         # Log the command being executed
         command_name = "view"  # default
-        if args.init:
+        if hasattr(args, 'command') and args.command == 'init':
             command_name = "init"
         elif args.view and increment_type:
             command_name = f"view-next-{increment_type}"
@@ -1505,7 +1507,7 @@ Configuration:
         logger.info(f"Executing command: {command_name}")
         
         # Execute the appropriate command (error handling is done at higher level)
-        if args.init:
+        if hasattr(args, 'command') and args.command == 'init':
             return self._execute_init_command()
         elif args.view:
             # View command with next version preview (default to patch if no increment type specified)
