@@ -15,7 +15,7 @@
 **Example**:
 ```bash
 # Check what files are being scanned
-python v-and-r.py --view
+python grtp.py --view
 
 # Test your regex pattern
 python -c "import re; print(re.compile(r'version = \"(v\d+\.\d+\.\d+)\"').search('version = \"v1.2.3\"'))"
@@ -117,13 +117,13 @@ touch test-write && rm test-write
 ### 1. Use `--view` first
 Always check what versions are detected before making changes:
 ```bash
-python v-and-r.py --view
+python grtp.py --view
 ```
 
 ### 2. Enable debug mode
 Use debug logging for detailed information:
 ```bash
-python v-and-r.py --debug --view
+python grtp.py --debug --view
 ```
 
 ### 3. Test regex patterns
@@ -234,20 +234,20 @@ git checkout -- .
 git checkout -- README.md src/app.py
 
 # Verify restoration
-python v-and-r.py --view
+python grtp.py --view
 ```
 
 ### Fix Version Inconsistencies
 
 ```bash
 # Find all versions
-python v-and-r.py --view
+python grtp.py --view
 
 # Manually fix files with wrong versions
 # Edit files to match the highest version
 
 # Verify consistency
-python v-and-r.py --view
+python grtp.py --view
 
 # If needed, force update to specific version
 # (Edit VERSION_FILES to temporarily match current versions, then increment)
@@ -258,7 +258,7 @@ python v-and-r.py --view
 ```bash
 # If git tags are corrupted
 git tag -d v1.2.3  # Delete bad tag
-python v-and-r.py --release-deploy -m "Recreate v1.2.3"
+python grtp.py --release-deploy -m "Recreate v1.2.3"
 
 # If git history is problematic
 git log --oneline  # Check history
@@ -308,17 +308,17 @@ git reset --hard HEAD~1
 
 ```bash
 # General help
-python v-and-r.py --help
+python grtp.py --help
 
 # Command-specific examples
-python v-and-r.py --help | grep -A5 "Examples:"
+python grtp.py --help | grep -A5 "Examples:"
 ```
 
 ### Debug Information
 
 ```bash
 # Enable debug logging
-python v-and-r.py --debug --view
+python grtp.py --debug --view
 
 # Check Python version
 python --version

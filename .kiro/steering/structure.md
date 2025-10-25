@@ -4,7 +4,7 @@
 ```
 /
 ├── README.md              # Project documentation and usage examples
-├── v-and-r.py            # Main CLI script (to be created)
+├── grtp.py               # Main CLI script (to be created)
 ├── .kiro/                # Kiro AI assistant configuration
 │   ├── specs/            # Feature specifications
 │   └── steering/         # AI guidance documents
@@ -12,7 +12,7 @@
 ```
 
 ## Core Files
-- **v-and-r.py**: Main executable script containing all CLI functionality
+- **grtp.py**: Main executable script containing all CLI functionality
 - **README.md**: Contains usage documentation and VERSION_FILES configuration examples
 - **version.json**: Auto-generated file containing release metadata and version history
 
@@ -27,12 +27,12 @@
 - **Specifications**: Follow structured format with requirements, acceptance criteria, and user stories
 
 ## File Naming Conventions
-- **Script Name**: `v-and-r.py` (matches CLI command name)
+- **Script Name**: `grtp.py` (matches CLI command name)
 - **Generated Files**: `version.json` for release metadata
 - **Documentation**: Standard `README.md` for project documentation
 
 ## Development Workflow
 1. Specifications defined in `.kiro/specs/`
-2. Implementation in single `v-and-r.py` file
+2. Implementation in single `grtp.py` file
 3. Configuration examples maintained in README.md
 4. Testing using `--view` and `--dry-run` flags (when implemented)

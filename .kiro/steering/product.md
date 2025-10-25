@@ -1,12 +1,13 @@
 # Product Overview
 
-## v-and-r - Version and Release Manager
+## grtp - Grey Red Teal Purple (ATDD/TDD Process Automation)
 
-A command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles and integrates with git for release management.
+A command-line tool that helps with ATDD/TDD (Acceptance Test-Driven Development / Test-Driven Development) process automation and automates version management and release processes across multiple project files. The tool follows semantic versioning principles and integrates with git for release management.
 Prototype in Python, but limited.
 
 
 ### Core Features
+- **ATDD/TDD Process Support**: Automates test-driven development workflows and acceptance testing processes
 - **Version Discovery**: Scans configured files to find and display current versions
 - **Semantic Versioning**: Supports patch, minor, and major version increments
 - **Multi-file Updates**: Updates version numbers across multiple files using configurable patterns
@@ -14,10 +15,10 @@ Prototype in Python, but limited.
 - **Git Integration**: Leverages git tags and commit history for release tracking
 
 ### Target Users
-Developers and teams who need to maintain consistent version numbers across multiple files in their projects and want automated release management capabilities.
+Developers and teams practicing ATDD/TDD methodologies who need to maintain consistent version numbers across multiple files in their projects and want automated release management capabilities.
 
 ### Key Value Proposition
-Eliminates manual version management errors and provides a single command interface for version control and release documentation.
+Streamlines ATDD/TDD workflows while eliminating manual version management errors and providing a single command interface for test automation, version control, and release documentation.
 
 ### Use of CHANGELOG.md and RELEASES.md
 

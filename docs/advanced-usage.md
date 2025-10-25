@@ -4,7 +4,7 @@
 
 ### Non-standard Version Patterns
 
-While v-and-r follows semantic versioning by default, you can customize it for different formats:
+While grtp follows semantic versioning by default, you can customize it for different formats:
 
 ```python
 # Date-based versions
@@ -133,9 +133,9 @@ log() {
 }
 
 check_clean_working_directory() {
-    if ! python v-and-r.py --view | grep -q "Working directory clean"; then
+    if ! python grtp.py --view | grep -q "Working directory clean"; then
         log "ERROR: Working directory not clean"
-        python v-and-r.py --view
+        python grtp.py --view
         exit 1
     fi
 }
@@ -167,7 +167,7 @@ main() {
     
     # Show preview
     log "Preview of changes:"
-    python v-and-r.py --view --${INCREMENT}
+    python grtp.py --view --${INCREMENT}
     
     # Confirm release
     read -p "Proceed with $INCREMENT release? (y/N): " -n 1 -r
@@ -179,13 +179,13 @@ main() {
     
     # Execute release
     log "Incrementing version ($INCREMENT)"
-    python v-and-r.py --${INCREMENT}
+    python grtp.py --${INCREMENT}
     
     log "Preparing release documentation"
-    python v-and-r.py --release-prepare
+    python grtp.py --release-prepare
     
     log "Creating git tag"
-    python v-and-r.py --release-deploy -m "Automated $INCREMENT release"
+    python grtp.py --release-deploy -m "Automated $INCREMENT release"
     
     log "Pushing changes"
     git push origin $BRANCH
@@ -237,7 +237,7 @@ jobs:
         
     - name: Check working directory
       run: |
-        python v-and-r.py --view
+        python grtp.py --view
         
     - name: Determine increment type
       id: increment
@@ -257,21 +257,21 @@ jobs:
         
     - name: Increment version
       run: |
-        python v-and-r.py --${{ steps.increment.outputs.type }}
+        python grtp.py --${{ steps.increment.outputs.type }}
         
     - name: Prepare release
       run: |
-        python v-and-r.py --release-prepare
+        python grtp.py --release-prepare
         
     - name: Get new version
       id: version
       run: |
-        VERSION=$(python v-and-r.py --view | grep "Highest version:" | cut -d' ' -f3)
+        VERSION=$(python grtp.py --view | grep "Highest version:" | cut -d' ' -f3)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         
     - name: Create git tag
       run: |
-        python v-and-r.py --release-deploy -m "Release ${{ steps.version.outputs.version }}"
+        python grtp.py --release-deploy -m "Release ${{ steps.version.outputs.version }}"
         
     - name: Push changes
       run: |
@@ -302,7 +302,7 @@ import re
 import os
 
 def get_version():
-    """Extract version from v-and-r managed files"""
+    """Extract version from grtp managed files"""
     version_file = os.path.join(os.path.dirname(__file__), 'src', '__init__.py')
     with open(version_file, 'r') as f:
         content = f.read()
@@ -327,8 +327,8 @@ setup(
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-// Get version from v-and-r
-const output = execSync('python v-and-r.py --view', { encoding: 'utf8' });
+// Get version from grtp
+const output = execSync('python grtp.py --view', { encoding: 'utf8' });
 const versionMatch = output.match(/Highest version: (v\d+\.\d+\.\d+)/);
 
 if (versionMatch) {
@@ -357,7 +357,7 @@ import re
 sys.path.insert(0, os.path.abspath('..'))
 
 def get_version():
-    """Get version from v-and-r managed files"""
+    """Get version from grtp managed files"""
     version_file = os.path.join(os.path.dirname(__file__), '..', 'src', '__init__.py')
     with open(version_file, 'r') as f:
         content = f.read()
@@ -381,9 +381,9 @@ release = version
 site_name: My Project
 site_description: Project documentation
 
-# Use version from v-and-r
+# Use version from grtp
 site_version: !ENV [PROJECT_VERSION, 'development']
 
 # In CI/CD, set PROJECT_VERSION environment variable:
-# export PROJECT_VERSION=$(python v-and-r.py --view | grep "Highest version:" | cut -d' ' -f3)
+# export PROJECT_VERSION=$(python grtp.py --view | grep "Highest version:" | cut -d' ' -f3)
 ```

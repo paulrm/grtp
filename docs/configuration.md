@@ -2,9 +2,9 @@
 
 ## Overview
 
-v-and-r supports two configuration methods:
+grtp supports two configuration methods:
 
-1. **External Configuration** (Recommended): `.v-and-r.json` file in your project root
+1. **External Configuration** (Recommended): `.grtp.json` file in your project root
 2. **Embedded Configuration** (Fallback): `VERSION_FILES` array in the script
 
 The tool automatically uses external configuration if available, otherwise falls back to embedded configuration.
@@ -16,10 +16,10 @@ The tool automatically uses external configuration if available, otherwise falls
 Create a default configuration file:
 
 ```bash
-v-and-r --init
+grtp --init
 ```
 
-This creates `.v-and-r.json` with default patterns for common file types.
+This creates `.grtp.json` with default patterns for common file types.
 
 ### Configuration Structure
 
@@ -54,7 +54,7 @@ Each configuration entry must contain:
 
 ## Embedded Configuration (Fallback)
 
-If no `.v-and-r.json` file exists, the tool uses embedded configuration in `v-and-r.py`:
+If no `.grtp.json` file exists, the tool uses embedded configuration in `grtp.py`:
 
 ```python
 def get_embedded_version_files_config() -> List[Dict]:
