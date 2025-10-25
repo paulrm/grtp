@@ -10,7 +10,7 @@
 - 🚀 Task 4 / Implement GitManager class for git integration (8a845ea)
 - 🚀 Task 3 /  Implement FileManager class for file operations and pattern matching (14a1fbd)
 - 🚀 Implemented VersionManager class with semantic versioning logic and unit tests (5416252)
-- 📦 Added '.gitignore' and 'v-and-r.py' files (ffde339)
+- 📦 Added '.gitignore' and 'grtp.py' files (ffde339)
 - 📝 Added new tasks documentation for version-release manager in specs (9b8802b)
 - 📝 Added design document for version release manager in kiro specs (e7d9814)
 - 📝✨ Added detailed description and sample for using CHANGELOG.md and RELEASES.md in product.md, also added requirements.md for version-release-manager (de7a779)
@@ -27,7 +27,7 @@ cea2e8c 📂✅ Added new 'config.py' and 'utils.py' files, finished 'view comma
 8a845ea 🚀 Task 4 / Implement GitManager class for git integration   	paulrm	2025-09-26
 14a1fbd 🚀 Task 3 /  Implement FileManager class for file operations and pattern matching	paulrm	2025-09-26
 5416252 🚀 Implemented VersionManager class with semantic versioning logic and unit tests	paulrm	2025-09-26
-ffde339 📦 Added '.gitignore' and 'v-and-r.py' files                 	paulrm	2025-09-26
+ffde339 📦 Added '.gitignore' and 'grtp.py' files                 	paulrm	2025-09-26
 9b8802b 📝 Added new tasks documentation for version-release manager in specs	paulrm	2025-09-26
 e7d9814 📝 Added design document for version release manager in kiro specs	paulrm	2025-09-26
 de7a779 📝✨ Added detailed description and sample for using CHANGELOG.md and RELEASES.md in product.md, also added requirements.md for version-release-manager	paulrm	2025-09-26
@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🚀 Task 4 / Implement GitManager class for git integration (8a845ea)
 - 🚀 Task 3 /  Implement FileManager class for file operations and pattern matching (14a1fbd)
 - 🚀 Implemented VersionManager class with semantic versioning logic and unit tests (5416252)
-- 📦 Added '.gitignore' and 'v-and-r.py' files (ffde339)
+- 📦 Added '.gitignore' and 'grtp.py' files (ffde339)
 - 📝 Added new tasks documentation for version-release manager in specs (9b8802b)
 - 📝 Added design document for version release manager in kiro specs (e7d9814)
 - 📝✨ Added detailed description and sample for using CHANGELOG.md and RELEASES.md in product.md, also added requirements.md for version-release-manager (de7a779)
@@ -69,7 +69,7 @@ cea2e8c 📂✅ Added new 'config.py' and 'utils.py' files, finished 'view comma
 8a845ea 🚀 Task 4 / Implement GitManager class for git integration   	paulrm	2025-09-26
 14a1fbd 🚀 Task 3 /  Implement FileManager class for file operations and pattern matching	paulrm	2025-09-26
 5416252 🚀 Implemented VersionManager class with semantic versioning logic and unit tests	paulrm	2025-09-26
-ffde339 📦 Added '.gitignore' and 'v-and-r.py' files                 	paulrm	2025-09-26
+ffde339 📦 Added '.gitignore' and 'grtp.py' files                 	paulrm	2025-09-26
 9b8802b 📝 Added new tasks documentation for version-release manager in specs	paulrm	2025-09-26
 e7d9814 📝 Added design document for version release manager in kiro specs	paulrm	2025-09-26
 de7a779 📝✨ Added detailed description and sample for using CHANGELOG.md and RELEASES.md in product.md, also added requirements.md for version-release-manager	paulrm	2025-09-26

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The v-and-r (Version and Release Manager) is a command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project. It provides a single interface for version discovery, incrementation, and release documentation generation.
+The grtp (Grey Red Teal Purple) is a command-line tool that automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project. It provides a single interface for version discovery, incrementation, and release documentation generation.
 
 all configured files are defined in VERSION_FILES 
 
@@ -14,7 +14,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -v` or `v-and-r --view` THEN the system SHALL display the current version found in each configured file
+1. WHEN the user runs `grtp -v` or `grtp --view` THEN the system SHALL display the current version found in each configured file
 2. WHEN multiple files contain different versions THEN the system SHALL display all versions and highlight the highest version
 3. WHEN no version is found in a file THEN the system SHALL indicate that no version was detected for that file
 4. WHEN the command is run without arguments THEN the system SHALL default to the view behavior
@@ -25,7 +25,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -p` or `v-and-r --patch` THEN the system SHALL find the highest version across all files
+1. WHEN the user runs `grtp -p` or `grtp --patch` THEN the system SHALL find the highest version across all files
 2. WHEN the highest version is identified THEN the system SHALL increment the patch number (e.g., v1.2.3 becomes v1.2.4)
 3. WHEN the new version is calculated THEN the system SHALL update all configured files with the new version
 4. WHEN files are updated THEN the system SHALL preserve the original format and only replace the version number
@@ -36,7 +36,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -mi` or `v-and-r --minor` THEN the system SHALL find the highest version across all files
+1. WHEN the user runs `grtp -mi` or `grtp --minor` THEN the system SHALL find the highest version across all files
 2. WHEN the highest version is identified THEN the system SHALL increment the minor number and reset patch to 0 (e.g., v1.2.3 becomes v1.3.0)
 3. WHEN the new version is calculated THEN the system SHALL update all configured files with the new version
 
@@ -46,7 +46,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -ma` or `v-and-r --major` THEN the system SHALL find the highest version across all files
+1. WHEN the user runs `grtp -ma` or `grtp --major` THEN the system SHALL find the highest version across all files
 2. WHEN the highest version is identified THEN the system SHALL increment the major number and reset minor and patch to 0 (e.g., v1.2.3 becomes v2.0.0)
 3. WHEN the new version is calculated THEN the system SHALL update all configured files with the new version
 
@@ -56,7 +56,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -r` or `v-and-r --release-info` THEN the system SHALL generate a version.json file with release metadata
+1. WHEN the user runs `grtp -r` or `grtp --release-info` THEN the system SHALL generate a version.json file with release metadata
 2. WHEN version.json is generated THEN it SHALL contain the current version, timestamp, and commit information
 3. WHEN the command is executed THEN the system SHALL display release notes based on git commit history
 4. WHEN git tags exist THEN the system SHALL use tag information to generate release notes
@@ -67,7 +67,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -rd tag1 tag2` or `v-and-r --release-diff tag1 tag2` THEN the system SHALL show commits only between the specified tags
+1. WHEN the user runs `grtp -rd tag1 tag2` or `grtp --release-diff tag1 tag2` THEN the system SHALL show commits only between the specified tags
 2. WHEN invalid tags are provided THEN the system SHALL display an error message
 3. WHEN the tags are valid THEN the system SHALL format the commit list in a readable format
 
@@ -77,7 +77,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -rl` or `v-and-r --release-last` THEN the system SHALL show commits from the last git tag to HEAD
+1. WHEN the user runs `grtp -rl` or `grtp --release-last` THEN the system SHALL show commits from the last git tag to HEAD
 2. WHEN no git tags exist THEN the system SHALL show all commits from the beginning
 3. WHEN displaying commits THEN the system SHALL NOT update version.json file
 
@@ -87,7 +87,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -rp` or `v-and-r --release-prepare` THEN the system SHALL update the version.json file
+1. WHEN the user runs `grtp -rp` or `grtp --release-prepare` THEN the system SHALL update the version.json file
 2. WHEN preparing a release THEN the system SHALL create or update CHANGELOG.md file
 3. WHEN preparing a release THEN the system SHALL create or update RELEASES.md file
 4. WHEN updating documentation files THEN the system SHALL preserve existing content and append new release information
@@ -110,7 +110,7 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r -h` or `v-and-r --help` THEN the system SHALL display comprehensive help information
+1. WHEN the user runs `grtp -h` or `grtp --help` THEN the system SHALL display comprehensive help information
 2. WHEN help is displayed THEN it SHALL include all available commands with their descriptions
 3. WHEN help is displayed THEN it SHALL include usage examples and configuration guidance
 
@@ -141,8 +141,8 @@ all configured files are defined in VERSION_FILES
 
 #### Acceptance Criteria
 
-1. WHEN the user runs `v-and-r --release-deploy` THEN the system SHALL create a git tag with the current highest version
-2. WHEN the user runs `v-and-r --release-deploy -m "Release Name"` THEN the system SHALL create an annotated git tag with the specified release name as the tag message
+1. WHEN the user runs `grtp --release-deploy` THEN the system SHALL create a git tag with the current highest version
+2. WHEN the user runs `grtp --release-deploy -m "Release Name"` THEN the system SHALL create an annotated git tag with the specified release name as the tag message
 3. WHEN creating a git tag THEN the system SHALL use the current highest version found across all configured files as the tag name
 4. WHEN the git tag is created successfully THEN the system SHALL display confirmation with the tag name and message
 5. WHEN git tag creation fails THEN the system SHALL display an appropriate error message

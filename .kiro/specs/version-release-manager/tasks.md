@@ -1,11 +1,11 @@
 # Implementation Plan
 
 - [x] 1. Set up project structure and core data models
-  - Create the main v-and-r.py file with basic structure
+  - Create the main grtp.py file with basic structure
   - Implement Version dataclass with comparison methods and string representation
   - Implement FileConfig dataclass for configuration entries
   - Implement ReleaseInfo dataclass for release metadata
-  - Create custom exception classes (VAndRError, VersionError, FileError, GitError)
+  - Create custom exception classes (GrtpError, VersionError, FileError, GitError)
   - _Requirements: 11.1, 11.2, 9.1, 9.2_
 
 - [x] 2. Implement VersionManager class with semantic versioning logic

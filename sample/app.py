@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sample application file for testing v-and-r version management.
+Sample application file for testing grtp version management.
 - Version v0.0.0
 """
 
