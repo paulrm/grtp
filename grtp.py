@@ -314,9 +314,13 @@ class FileManager:
         if config['pattern'].groups < 1:
             raise FileError(f"Regex pattern must have at least one capture group: {config['pattern'].pattern}")
     
-    def expand_file_patterns(self) -> List[str]:
+    def expand_file_patterns(self, file_filter: Optional[List[str]] = None) -> List[str]:
         """
         Expand glob patterns to actual file paths.
+        
+        Args:
+            file_filter: Optional list of specific files to process. If provided,
+                        only files matching both the config patterns and filter will be returned.
         
         Returns:
             List of actual file paths that match the configured patterns
@@ -340,11 +344,27 @@ class FileManager:
                     expanded_files.append(pattern)
         
         # Remove duplicates and sort
-        return sorted(list(set(expanded_files)))
+        all_files = sorted(list(set(expanded_files)))
+        
+        # Apply file filter if provided
+        if file_filter:
+            filtered_files = []
+            for file_path in all_files:
+                # Check if file matches any of the filter patterns
+                for filter_pattern in file_filter:
+                    if self._file_matches_pattern(file_path, filter_pattern) or file_path == filter_pattern:
+                        filtered_files.append(file_path)
+                        break
+            return filtered_files
+        
+        return all_files
     
-    def find_versions_in_files(self) -> Dict[str, str]:
+    def find_versions_in_files(self, file_filter: Optional[List[str]] = None) -> Dict[str, str]:
         """
         Find current versions in all configured files.
+        
+        Args:
+            file_filter: Optional list of specific files to process
         
         Returns:
             Dictionary mapping file paths to found version strings
@@ -353,7 +373,7 @@ class FileManager:
             FileError: If file cannot be read
         """
         versions_found = {}
-        expanded_files = self.expand_file_patterns()
+        expanded_files = self.expand_file_patterns(file_filter)
         
         for file_path in expanded_files:
             # Find the matching configuration for this file
@@ -458,18 +478,19 @@ class FileManager:
         except KeyError as e:
             raise FileError(f"Template formatting error for {file_path}: {e}")
     
-    def update_all_files(self, new_version: str) -> Dict[str, bool]:
+    def update_all_files(self, new_version: str, file_filter: Optional[List[str]] = None) -> Dict[str, bool]:
         """
         Update version in all configured files.
         
         Args:
             new_version: New version string to set in all files
+            file_filter: Optional list of specific files to process
             
         Returns:
             Dictionary mapping file paths to update success status
         """
         results = {}
-        expanded_files = self.expand_file_patterns()
+        expanded_files = self.expand_file_patterns(file_filter)
         
         for file_path in expanded_files:
             try:
@@ -490,7 +511,7 @@ class ConfigManager:
     
     def __init__(self):
         """Initialize ConfigManager"""
-        pass
+        self.config_source = None  # Track where config was loaded from
     
     def config_exists(self, directory: str = '.') -> bool:
         """
@@ -597,6 +618,11 @@ class ConfigManager:
                     "template": "- Version v{version}"
                 },
                 {
+                    "file": "manifest.json",
+                    "pattern": r'"version": "v(\d+\.\d+\.\d+)"',
+                    "template": '"version": "v{version}"'
+                },
+                {
                     "file": "package.json",
                     "pattern": r'"version": "(\d+\.\d+\.\d+)"',
                     "template": '"version": "{version}"'
@@ -627,10 +653,13 @@ class ConfigManager:
         """
         if self.config_exists(directory):
             # Use external configuration
+            config_path = os.path.join(directory, self.CONFIG_FILENAME)
+            self.config_source = os.path.abspath(config_path)
             config_data = self.load_config(directory)
             return config_data['VERSION_FILES']
         else:
             # Fall back to embedded configuration
+            self.config_source = 'embedded'
             return get_embedded_version_files_config()
 
 
@@ -1098,21 +1127,15 @@ def get_embedded_version_files_config() -> List[Dict]:
         'pattern': re.compile(r'- Version v(\d+\.\d+\.\d+)'),
         'template': '- Version v{version}',
     },
-    # Chrome extension popup.js (with v prefix)
+   # Chrome extension manifest.json (no v prefix - standard format)
     {
-        'file': 'chrome-extension/popup.js',
-        'pattern': re.compile(r'const VERSION = "v(\d+\.\d+\.\d+)"'),
-        'template': 'const VERSION = "v{version}"'
-    },
-    # Chrome extension manifest.json (no v prefix - standard format)
-    {
-        'file': 'chrome-extension/manifest.json',
-        'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
-        'template': '"version": "{version}"',
+        'file': 'manifest.json',
+        'pattern': re.compile(r'"version": "v(\d+\.\d+\.\d+)"'),
+        'template': '"version": "v{version}"',
     },
      # VScode  extension package.json (no v prefix - standard format)
     {
-        'file': 'vscode-extension/package.json',
+        'file': 'package.json',
         'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
         'template': '"version": "{version}"',
     },
@@ -1244,6 +1267,7 @@ class CLIInterface:
     
     def __init__(self):
         """Initialize CLI interface with managers"""
+        logger = logging.getLogger('grtp')
         self.version_manager = VersionManager()
         self.config_manager = ConfigManager()
         
@@ -1251,6 +1275,16 @@ class CLIInterface:
         try:
             version_files_config = self.config_manager.get_version_files_config()
             self.file_manager = FileManager(version_files_config)
+            
+            # Log which configured files are being used
+            config_source = self.config_manager.config_source
+            if config_source == 'embedded':
+                logger.info(f"Using embedded configuration (no .grtp.json found)")
+            else:
+                logger.info(f"Using configuration from: {config_source}")
+            logger.info(f"Loaded {len(self.file_manager.file_configs)} configured file pattern(s)")
+            for i, config in enumerate(self.file_manager.file_configs, 1):
+                logger.info(f"  Config {i}: file_pattern='{config.file_pattern}', template='{config.template}'")
         except FileError as e:
             print(f"Error loading configuration: {e}")
             sys.exit(1)
@@ -1299,6 +1333,12 @@ Examples:
   grtp --release-prepare  # Prepare release documentation
   grtp --release-deploy   # Create git tag for current version
   grtp --release-deploy -m "Release v1.2.3"  # Create annotated git tag
+  
+  # Process specific files only:
+  grtp -v version.json    # View version in specific file
+  grtp -p CHANGELOG.md RELEASES.md  # Increment patch version in specific files
+  grtp -mi sample/*.py    # Increment minor version in Python files under sample/
+  grtp version.json README.md  # View versions in specific files (default)
 
 Configuration:
   The tool uses .grtp.json configuration file if present in the current directory,
@@ -1396,6 +1436,13 @@ Configuration:
             '-d', '--debug',
             action='store_true',
             help='Enable debug logging for troubleshooting'
+        )
+        
+        # Positional arguments for file filtering
+        parser.add_argument(
+            'files',
+            nargs='*',
+            help='Optional file(s) to process. If not specified, all configured files will be processed'
         )
         
         # Parse arguments
@@ -1504,6 +1551,11 @@ Configuration:
         
         logger.info(f"Executing command: {command_name}")
         
+        # Extract file filter from arguments
+        file_filter = args.files if hasattr(args, 'files') and args.files else None
+        if file_filter:
+            logger.info(f"File filter applied: {file_filter}")
+        
         # Execute the appropriate command (error handling is done at higher level)
         if args.init:
             return self._execute_init_command()
@@ -1511,10 +1563,10 @@ Configuration:
             # View command with next version preview (default to patch if no increment type specified)
             next_version_type = increment_type if increment_type else "patch"
             show_git = getattr(args, 'git', False)
-            return self._execute_view_command(next_version_type, show_git)
+            return self._execute_view_command(next_version_type, show_git, file_filter)
         elif increment_type and not args.view:
             # Increment command (actual file modification)
-            return self._execute_increment_command(increment_type)
+            return self._execute_increment_command(increment_type, file_filter)
         elif args.release_info:
             return self._execute_release_info_command()
         elif args.release_diff:
@@ -1532,7 +1584,7 @@ Configuration:
         else:
             # Default to view if no command specified (with default patch preview)
             show_git = getattr(args, 'git', False)
-            return self._execute_view_command("patch", show_git)
+            return self._execute_view_command("patch", show_git, file_filter)
     
     def _execute_init_command(self) -> int:
         """
@@ -1574,13 +1626,14 @@ Configuration:
             print(f"Error creating configuration file: {e}")
             return 1
     
-    def _execute_view_command(self, next_version_type: Optional[str] = None, show_git: bool = False) -> int:
+    def _execute_view_command(self, next_version_type: Optional[str] = None, show_git: bool = False, file_filter: Optional[List[str]] = None) -> int:
         """
         Execute view command to display current versions and optionally next version.
         
         Args:
             next_version_type: Type of next version to show ('patch', 'minor', 'major'), or None
             show_git: Whether to display git information (tags, commits)
+            file_filter: Optional list of specific files to process
         
         Returns:
             Exit code (0 for success, 1 for failure)
@@ -1590,11 +1643,13 @@ Configuration:
         
         print("grtp - Grey Red Teal Purple (ATDD/TDD Process Automation)")
         print("=" * 50)
+        if file_filter:
+            print(f"Processing specific files: {', '.join(file_filter)}")
         print("Current versions across configured files:")
         print()
         
         logger.debug("Scanning files for versions")
-        versions_found = self.file_manager.find_versions_in_files()
+        versions_found = self.file_manager.find_versions_in_files(file_filter)
         logger.debug(f"Found versions in {len(versions_found)} files")
         
         if not versions_found:
@@ -1840,22 +1895,26 @@ Configuration:
         except Exception as e:
             logger.warning(f"Unexpected error retrieving git status: {e}")
     
-    def _execute_increment_command(self, increment_type: str) -> int:
+    def _execute_increment_command(self, increment_type: str, file_filter: Optional[List[str]] = None) -> int:
         """
         Execute version increment command with rollback mechanism and confirmation.
         
         Args:
             increment_type: Type of increment ('patch', 'minor', 'major')
+            file_filter: Optional list of specific files to process
             
         Returns:
             Exit code (0 for success, 1 for failure)
         """
         print(f"grtp: Incrementing {increment_type} version")
         print("=" * 50)
+        if file_filter:
+            print(f"Processing specific files: {', '.join(file_filter)}")
+            print()
         
         try:
             # Find current versions
-            versions_found = self.file_manager.find_versions_in_files()
+            versions_found = self.file_manager.find_versions_in_files(file_filter)
             
             if not versions_found:
                 print("Error: No versions found in configured files.")
@@ -1902,7 +1961,7 @@ Configuration:
             
             # Store original file contents for rollback
             original_contents = {}
-            files_to_update = self.file_manager.expand_file_patterns()
+            files_to_update = self.file_manager.expand_file_patterns(file_filter)
             
             # Read original contents before making changes
             for file_path in files_to_update:
@@ -3061,12 +3120,13 @@ def validate_version_files_config(config: List[Dict]) -> None:
     logger.info(f"VERSION_FILES configuration validated successfully ({len(config)} entries)")
 
 
-def execute_command(args: argparse.Namespace) -> int:
+def execute_command(args: argparse.Namespace, cli: Optional['CLIInterface'] = None) -> int:
     """
     Execute the appropriate command based on parsed arguments with comprehensive error handling.
     
     Args:
         args: Parsed arguments namespace
+        cli: Optional CLIInterface instance to use (creates new one if not provided)
         
     Returns:
         Exit code (0 for success, non-zero for failure)
@@ -3074,9 +3134,10 @@ def execute_command(args: argparse.Namespace) -> int:
     logger = logging.getLogger('grtp')
     
     try:
-        # Initialize CLI interface (configuration validation happens in __init__)
-        logger.debug("Initializing CLI interface")
-        cli = CLIInterface()
+        # Initialize CLI interface if not provided (configuration validation happens in __init__)
+        if cli is None:
+            logger.debug("Initializing CLI interface")
+            cli = CLIInterface()
         
         # Execute the requested command
         logger.info(f"Executing command with args: {args}")
@@ -3149,7 +3210,7 @@ def main():
         logger.debug(f"Parsed arguments: {args}")
         
         # Execute the command
-        exit_code = execute_command(args)
+        exit_code = execute_command(args, cli)
         
         logger.info(f"Command completed with exit code: {exit_code}")
         sys.exit(exit_code)
