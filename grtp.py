@@ -619,8 +619,8 @@ class ConfigManager:
                 },
                 {
                     "file": "manifest.json",
-                    "pattern": r'"version": "v(\d+\.\d+\.\d+)"',
-                    "template": '"version": "v{version}"'
+                    "pattern": r'"version": "(\d+\.\d+\.\d+)"',
+                    "template": '"version": "{version}"'
                 },
                 {
                     "file": "package.json",
@@ -1130,8 +1130,8 @@ def get_embedded_version_files_config() -> List[Dict]:
    # Chrome extension manifest.json (no v prefix - standard format)
     {
         'file': 'manifest.json',
-        'pattern': re.compile(r'"version": "v(\d+\.\d+\.\d+)"'),
-        'template': '"version": "v{version}"',
+        'pattern': re.compile(r'"version": "(\d+\.\d+\.\d+)"'),
+        'template': '"version": "{version}"',
     },
      # VScode  extension package.json (no v prefix - standard format)
     {
@@ -1339,6 +1339,11 @@ Examples:
   grtp -p CHANGELOG.md RELEASES.md  # Increment patch version in specific files
   grtp -mi sample/*.py    # Increment minor version in Python files under sample/
   grtp version.json README.md  # View versions in specific files (default)
+  
+  # Use force flag to skip confirmations:
+  grtp -p -f              # Increment patch version without confirmation
+  grtp -f --patch         # Increment patch version without confirmation
+  grtp --release-deploy -f  # Deploy release tag without confirmation
 
 Configuration:
   The tool uses .grtp.json configuration file if present in the current directory,
@@ -1436,6 +1441,12 @@ Configuration:
             '-d', '--debug',
             action='store_true',
             help='Enable debug logging for troubleshooting'
+        )
+        
+        parser.add_argument(
+            '-f', '--force',
+            action='store_true',
+            help='Skip confirmation prompts and proceed automatically'
         )
         
         # Positional arguments for file filtering
@@ -1556,6 +1567,11 @@ Configuration:
         if file_filter:
             logger.info(f"File filter applied: {file_filter}")
         
+        # Extract force flag
+        force = getattr(args, 'force', False)
+        if force:
+            logger.info("Force mode enabled: skipping confirmation prompts")
+        
         # Execute the appropriate command (error handling is done at higher level)
         if args.init:
             return self._execute_init_command()
@@ -1566,7 +1582,7 @@ Configuration:
             return self._execute_view_command(next_version_type, show_git, file_filter)
         elif increment_type and not args.view:
             # Increment command (actual file modification)
-            return self._execute_increment_command(increment_type, file_filter)
+            return self._execute_increment_command(increment_type, file_filter, force)
         elif args.release_info:
             return self._execute_release_info_command()
         elif args.release_diff:
@@ -1580,7 +1596,7 @@ Configuration:
             return self._execute_release_prepare_command()
         elif args.release_deploy:
             message = getattr(args, 'message', None)
-            return self._execute_release_deploy_command(message)
+            return self._execute_release_deploy_command(message, force)
         else:
             # Default to view if no command specified (with default patch preview)
             show_git = getattr(args, 'git', False)
@@ -1895,13 +1911,14 @@ Configuration:
         except Exception as e:
             logger.warning(f"Unexpected error retrieving git status: {e}")
     
-    def _execute_increment_command(self, increment_type: str, file_filter: Optional[List[str]] = None) -> int:
+    def _execute_increment_command(self, increment_type: str, file_filter: Optional[List[str]] = None, force: bool = False) -> int:
         """
         Execute version increment command with rollback mechanism and confirmation.
         
         Args:
             increment_type: Type of increment ('patch', 'minor', 'major')
             file_filter: Optional list of specific files to process
+            force: Skip confirmation prompts if True
             
         Returns:
             Exit code (0 for success, 1 for failure)
@@ -1946,15 +1963,18 @@ Configuration:
             print(f"New version will be: {new_version}")
             print()
             
-            # Get confirmation from user
-            try:
-                confirmation = input(f"Proceed with {increment_type} version increment to {new_version}? (y/N): ").strip().lower()
-                if confirmation not in ['y', 'yes']:
-                    print("Operation cancelled by user.")
+            # Get confirmation from user (unless force mode)
+            if not force:
+                try:
+                    confirmation = input(f"Proceed with {increment_type} version increment to {new_version}? (y/N): ").strip().lower()
+                    if confirmation not in ['y', 'yes']:
+                        print("Operation cancelled by user.")
+                        return 0
+                except (EOFError, KeyboardInterrupt):
+                    print("\nOperation cancelled by user.")
                     return 0
-            except (EOFError, KeyboardInterrupt):
-                print("\nOperation cancelled by user.")
-                return 0
+            else:
+                print(f"Force mode: Proceeding with {increment_type} version increment to {new_version}")
             
             print()
             print("Updating files...")
@@ -2941,12 +2961,13 @@ This document contains release notes and highlights for each version.
             print(f"Unexpected error during release preparation: {e}")
             return 1
     
-    def _execute_release_deploy_command(self, message: Optional[str] = None) -> int:
+    def _execute_release_deploy_command(self, message: Optional[str] = None, force: bool = False) -> int:
         """
         Execute release deploy command to create git tag for current version.
         
         Args:
             message: Optional message for annotated git tag
+            force: Skip confirmation prompts if True
             
         Returns:
             Exit code (0 for success, 1 for failure)
@@ -2993,15 +3014,18 @@ This document contains release notes and highlights for each version.
             else:
                 print(f"Creating lightweight git tag '{current_version}'")
             
-            # Get confirmation from user
-            try:
-                confirmation = input(f"Proceed with creating git tag '{current_version}'? (y/N): ").strip().lower()
-                if confirmation not in ['y', 'yes']:
-                    print("Tag creation cancelled by user.")
+            # Get confirmation from user (unless force mode)
+            if not force:
+                try:
+                    confirmation = input(f"Proceed with creating git tag '{current_version}'? (y/N): ").strip().lower()
+                    if confirmation not in ['y', 'yes']:
+                        print("Tag creation cancelled by user.")
+                        return 0
+                except (EOFError, KeyboardInterrupt):
+                    print("\nTag creation cancelled by user.")
                     return 0
-            except (EOFError, KeyboardInterrupt):
-                print("\nTag creation cancelled by user.")
-                return 0
+            else:
+                print(f"Force mode: Proceeding with creating git tag '{current_version}'")
             
             print()
             print("Creating git tag...")
