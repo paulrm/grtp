@@ -6,6 +6,14 @@ A command-line tool that helps with ATDD/TDD (Acceptance Test-Driven Development
 Prototype in Python, but limited.
 
 
+# ATDD states
+  Grey) "Desing and Document"
+  Red) "Write test (that fails) and code"
+  Teal) "Document success and refactor"
+  Purple) "Prepare Release and deploy"
+
+
+
 ### Core Features
 - **ATDD/TDD Process Support**: Automates test-driven development workflows and acceptance testing processes
 - **Version Discovery**: Scans configured files to find and display current versions

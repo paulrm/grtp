@@ -16,6 +16,7 @@ import os
 import sys
 import datetime
 import logging
+import logging.handlers
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
@@ -342,9 +343,12 @@ class FileManager:
         # Remove duplicates and sort
         return sorted(list(set(expanded_files)))
     
-    def find_versions_in_files(self) -> Dict[str, str]:
+    def find_versions_in_files(self, filter_filenames: Optional[List[str]] = None) -> Dict[str, str]:
         """
-        Find current versions in all configured files.
+        Find current versions in all configured files or specific files if filter is provided.
+        
+        Args:
+            filter_filenames: Optional list of specific filenames to check (if None, checks all)
         
         Returns:
             Dictionary mapping file paths to found version strings
@@ -354,6 +358,23 @@ class FileManager:
         """
         versions_found = {}
         expanded_files = self.expand_file_patterns()
+        
+        # Filter files if specific filenames are provided
+        if filter_filenames:
+            filtered_files = []
+            for file_path in expanded_files:
+                if file_path in filter_filenames:
+                    filtered_files.append(file_path)
+            
+            # Check if any requested files were not found
+            found_files = set(filtered_files)
+            requested_files = set(filter_filenames)
+            not_found = requested_files - found_files
+            if not_found:
+                for missing_file in not_found:
+                    print(f"Warning: File '{missing_file}' not found in configured patterns")
+            
+            expanded_files = filtered_files
         
         for file_path in expanded_files:
             # Find the matching configuration for this file
@@ -458,18 +479,36 @@ class FileManager:
         except KeyError as e:
             raise FileError(f"Template formatting error for {file_path}: {e}")
     
-    def update_all_files(self, new_version: str) -> Dict[str, bool]:
+    def update_all_files(self, new_version: str, filter_filenames: Optional[List[str]] = None) -> Dict[str, bool]:
         """
-        Update version in all configured files.
+        Update version in all configured files or specific files if filter is provided.
         
         Args:
             new_version: New version string to set in all files
+            filter_filenames: Optional list of specific filenames to update (if None, updates all)
             
         Returns:
             Dictionary mapping file paths to update success status
         """
         results = {}
         expanded_files = self.expand_file_patterns()
+        
+        # Filter files if specific filenames are provided
+        if filter_filenames:
+            filtered_files = []
+            for file_path in expanded_files:
+                if file_path in filter_filenames:
+                    filtered_files.append(file_path)
+            
+            # Check if any requested files were not found
+            found_files = set(filtered_files)
+            requested_files = set(filter_filenames)
+            not_found = requested_files - found_files
+            if not_found:
+                for missing_file in not_found:
+                    print(f"Warning: File '{missing_file}' not found in configured patterns")
+            
+            expanded_files = filtered_files
         
         for file_path in expanded_files:
             try:
@@ -481,6 +520,81 @@ class FileManager:
                 print(f"Warning: Failed to update {file_path}: {e}")
         
         return results
+
+
+class StateManager:
+    """Handles ATDD/TDD state management (Grey, Red, Teal, Purple)"""
+    
+    VALID_STATES = ['Grey', 'Red', 'Teal', 'Purple']
+    
+    def __init__(self, config_manager):
+        """
+        Initialize StateManager with a ConfigManager instance.
+        
+        Args:
+            config_manager: ConfigManager instance for loading/saving state
+        """
+        self.config_manager = config_manager
+    
+    def get_current_state(self, directory: str = '.') -> Optional[str]:
+        """
+        Get the current ATDD/TDD state from configuration.
+        
+        Args:
+            directory: Directory to load config from
+            
+        Returns:
+            Current state string or None if not set
+        """
+        try:
+            if not self.config_manager.config_exists(directory):
+                return None
+            
+            config_data = self.config_manager.load_config(directory)
+            return config_data.get('state', None)
+        except FileError:
+            return None
+    
+    def set_state(self, state: str, directory: str = '.') -> bool:
+        """
+        Set the ATDD/TDD state in configuration.
+        
+        Args:
+            state: State to set (must be one of: Grey, Red, Teal, Purple)
+            directory: Directory to save config to
+            
+        Returns:
+            True if state was set successfully
+            
+        Raises:
+            ValueError: If state is not valid
+            FileError: If configuration cannot be saved
+        """
+        if state not in self.VALID_STATES:
+            raise ValueError(f"Invalid state '{state}'. Must be one of: {', '.join(self.VALID_STATES)}")
+        
+        config_data = {}
+        if self.config_manager.config_exists(directory):
+            config_data = self.config_manager.load_config(directory)
+        else:
+            config_data = self.config_manager.create_default_config(directory)
+        
+        config_data['state'] = state
+        self.config_manager.save_config(config_data, directory)
+        
+        return True
+    
+    def validate_state(self, state: str) -> bool:
+        """
+        Validate if a state string is valid.
+        
+        Args:
+            state: State string to validate
+            
+        Returns:
+            True if state is valid, False otherwise
+        """
+        return state in self.VALID_STATES
 
 
 class ConfigManager:
@@ -562,13 +676,23 @@ class ConfigManager:
         """
         config_path = os.path.join(directory, self.CONFIG_FILENAME)
         
-        # Convert compiled regex patterns to strings for JSON serialization
-        serializable_config = json.loads(json.dumps(config_data, default=str))
+        # Create a serializable version of the config
+        serializable_config = {}
         
-        # Convert regex patterns to string representations
-        for file_config in serializable_config.get('VERSION_FILES', []):
-            if 'pattern' in file_config and hasattr(file_config['pattern'], 'pattern'):
-                file_config['pattern'] = file_config['pattern'].pattern
+        for key, value in config_data.items():
+            if key == 'VERSION_FILES':
+                serializable_files = []
+                for file_config in value:
+                    serializable_file = {}
+                    for fkey, fvalue in file_config.items():
+                        if fkey == 'pattern' and isinstance(fvalue, re.Pattern):
+                            serializable_file[fkey] = fvalue.pattern
+                        else:
+                            serializable_file[fkey] = fvalue
+                    serializable_files.append(serializable_file)
+                serializable_config[key] = serializable_files
+            else:
+                serializable_config[key] = value
         
         try:
             with open(config_path, 'w', encoding='utf-8') as f:
@@ -1246,6 +1370,7 @@ class CLIInterface:
         """Initialize CLI interface with managers"""
         self.version_manager = VersionManager()
         self.config_manager = ConfigManager()
+        self.state_manager = StateManager(self.config_manager)
         
         # Load configuration (external or embedded)
         try:
@@ -1274,6 +1399,11 @@ class CLIInterface:
             epilog="""
 Examples:
   grtp init               # Create default .grtp.json configuration file
+  grtp Grey               # Set ATDD/TDD state to Grey
+  grtp Red                # Set ATDD/TDD state to Red
+  grtp Teal               # Set ATDD/TDD state to Teal
+  grtp Purple             # Set ATDD/TDD state to Purple
+  grtp view-state         # Display state as export command (export ATDD_STATE=...)
   grtp                    # View current versions with next patch version (default)
   grtp -v                 # View current versions with next patch version
   grtp --view             # View current versions with next patch version
@@ -1283,10 +1413,15 @@ Examples:
   grtp -v -ma             # View current versions with next major version
   grtp -p                 # Increment patch version
   grtp --patch            # Increment patch version
+  grtp -p README.md       # Increment patch version in README.md only
+  grtp -p -f README.md    # Increment patch version in README.md (no confirmation)
   grtp -mi                # Increment minor version
   grtp --minor            # Increment minor version
+  grtp -mi grtp.py README.md  # Increment minor version in specific files
   grtp -ma                # Increment major version
   grtp --major            # Increment major version
+  grtp -v README.md       # View version in README.md only
+  grtp README.md grtp.py  # View versions in specific files (default)
   grtp -r                 # Generate release information
   grtp --release-info     # Generate release information
   grtp -rd v1.0.0 v1.1.0  # Show commits between tags
@@ -1311,14 +1446,6 @@ Configuration:
         
         # Create mutually exclusive group for main commands (excluding increment commands)
         command_group = parser.add_mutually_exclusive_group()
-        
-        # Init command as subcommand
-        command_group.add_argument(
-            'command',
-            nargs='?',
-            choices=['init'],
-            help='Subcommand to execute (init: create default .grtp.json configuration file)'
-        )
         
         # View command (default)
         command_group.add_argument(
@@ -1399,8 +1526,41 @@ Configuration:
             help='Enable debug logging for troubleshooting'
         )
         
+        # Force flag to skip confirmation
+        parser.add_argument(
+            '-f', '--force',
+            action='store_true',
+            help='Skip confirmation prompts (auto-confirm all operations)'
+        )
+        
+        # Init command and state commands as subcommands (positional, optional)
+        parser.add_argument(
+            'command',
+            nargs='?',
+            help='Subcommand to execute (init: create default .grtp.json configuration file; view-state: display state as export command; Grey/Red/Teal/Purple: set ATDD/TDD state)'
+        )
+        
+        # File filtering argument (positional, at the end)
+        parser.add_argument(
+            'filenames',
+            nargs='*',
+            metavar='filename',
+            help='Specific file(s) to update (if not provided, all configured files are updated)'
+        )
+        
         # Parse arguments
         args = parser.parse_args()
+        
+        # Handle the case where filenames might be confused with commands
+        # If command is provided but not a valid choice, treat it as a filename
+        valid_commands = ['init', 'view-state', 'Grey', 'Red', 'Teal', 'Purple']
+        if hasattr(args, 'command') and args.command:
+            if args.command not in valid_commands:
+                # Command is actually a filename
+                if not args.filenames:
+                    args.filenames = []
+                args.filenames.insert(0, args.command)
+                args.command = None
         
         # Validate argument combinations
         self._validate_arguments(args)
@@ -1417,6 +1577,17 @@ Configuration:
         Raises:
             SystemExit: If invalid argument combinations detected
         """
+        # Check if filenames are provided with incompatible commands
+        if hasattr(args, 'filenames') and args.filenames:
+            if hasattr(args, 'command') and args.command:
+                print(f"Error: Cannot specify filenames with command '{args.command}'")
+                print("Filenames can only be used with --view, --patch, --minor, or --major")
+                sys.exit(1)
+            if args.release_info or args.release_diff or args.release_last or args.release_prepare or args.release_deploy:
+                print("Error: Cannot specify filenames with release commands")
+                print("Filenames can only be used with --view, --patch, --minor, or --major")
+                sys.exit(1)
+        
         # Check for release-diff argument validation
         if args.release_diff:
             if len(args.release_diff) == 1:
@@ -1486,6 +1657,10 @@ Configuration:
         command_name = "view"  # default
         if hasattr(args, 'command') and args.command == 'init':
             command_name = "init"
+        elif hasattr(args, 'command') and args.command == 'view-state':
+            command_name = "view-state"
+        elif hasattr(args, 'command') and args.command in StateManager.VALID_STATES:
+            command_name = f"set-state-{args.command}"
         elif args.view and increment_type:
             command_name = f"view-next-{increment_type}"
         elif increment_type and not args.view:
@@ -1506,17 +1681,31 @@ Configuration:
         
         logger.info(f"Executing command: {command_name}")
         
+        # Get filenames filter if provided
+        filenames = getattr(args, 'filenames', None)
+        if filenames:
+            filenames = [f for f in filenames if f]  # Filter out empty strings
+            if not filenames:
+                filenames = None
+        
+        # Get force flag
+        force = getattr(args, 'force', False)
+        
         # Execute the appropriate command (error handling is done at higher level)
         if hasattr(args, 'command') and args.command == 'init':
             return self._execute_init_command()
+        elif hasattr(args, 'command') and args.command == 'view-state':
+            return self._execute_view_state_command()
+        elif hasattr(args, 'command') and args.command in StateManager.VALID_STATES:
+            return self._execute_set_state_command(args.command)
         elif args.view:
             # View command with next version preview (default to patch if no increment type specified)
             next_version_type = increment_type if increment_type else "patch"
             show_git = getattr(args, 'git', False)
-            return self._execute_view_command(next_version_type, show_git)
+            return self._execute_view_command(next_version_type, show_git, filenames)
         elif increment_type and not args.view:
             # Increment command (actual file modification)
-            return self._execute_increment_command(increment_type)
+            return self._execute_increment_command(increment_type, filenames, force)
         elif args.release_info:
             return self._execute_release_info_command()
         elif args.release_diff:
@@ -1534,7 +1723,7 @@ Configuration:
         else:
             # Default to view if no command specified (with default patch preview)
             show_git = getattr(args, 'git', False)
-            return self._execute_view_command("patch", show_git)
+            return self._execute_view_command("patch", show_git, filenames)
     
     def _execute_init_command(self) -> int:
         """
@@ -1576,13 +1765,77 @@ Configuration:
             print(f"Error creating configuration file: {e}")
             return 1
     
-    def _execute_view_command(self, next_version_type: Optional[str] = None, show_git: bool = False) -> int:
+    def _execute_set_state_command(self, state: str) -> int:
+        """
+        Execute state command to set the ATDD/TDD state.
+        
+        Args:
+            state: State to set (Grey, Red, Teal, or Purple)
+        
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        logger = logging.getLogger('grtp')
+        logger.debug(f"Executing set state command: {state}")
+        
+        try:
+            current_state = self.state_manager.get_current_state('.')
+            
+            if not self.config_manager.config_exists('.'):
+                logger.info("Configuration file does not exist, creating it")
+                self.config_manager.create_default_config('.')
+            
+            self.state_manager.set_state(state, '.')
+            
+            print(f"ATDD/TDD State changed: {current_state or 'None'} → {state}")
+            logger.info(f"State changed from {current_state} to {state}")
+            
+            return 0
+            
+        except ValueError as e:
+            logger.error(f"Invalid state: {e}")
+            print(f"Error: {e}")
+            return 1
+        except FileError as e:
+            logger.error(f"Failed to save state: {e}")
+            print(f"Error saving state: {e}")
+            return 1
+    
+    def _execute_view_state_command(self) -> int:
+        """
+        Execute view-state command to display the current state as an export command.
+        
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        logger = logging.getLogger('grtp')
+        logger.debug("Executing view-state command")
+        
+        try:
+            current_state = self.state_manager.get_current_state('.')
+            
+            if current_state:
+                print(f"export ATDD_STATE={current_state}")
+                logger.info(f"Displayed state: {current_state}")
+                return 0
+            else:
+                print("export ATDD_STATE=")
+                logger.info("No state set")
+                return 0
+            
+        except Exception as e:
+            logger.error(f"Failed to get state: {e}")
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+    
+    def _execute_view_command(self, next_version_type: Optional[str] = None, show_git: bool = False, filter_filenames: Optional[List[str]] = None) -> int:
         """
         Execute view command to display current versions and optionally next version.
         
         Args:
             next_version_type: Type of next version to show ('patch', 'minor', 'major'), or None
             show_git: Whether to display git information (tags, commits)
+            filter_filenames: Optional list of specific filenames to view (if None, views all)
         
         Returns:
             Exit code (0 for success, 1 for failure)
@@ -1592,11 +1845,20 @@ Configuration:
         
         print("grtp - Grey Red Teal Purple (ATDD/TDD Process Automation)")
         print("=" * 50)
-        print("Current versions across configured files:")
+        
+        current_state = self.state_manager.get_current_state('.')
+        if current_state:
+            print(f"Current State: {current_state}")
+            print()
+        
+        if filter_filenames:
+            print(f"Current versions in specified files:")
+        else:
+            print("Current versions across configured files:")
         print()
         
         logger.debug("Scanning files for versions")
-        versions_found = self.file_manager.find_versions_in_files()
+        versions_found = self.file_manager.find_versions_in_files(filter_filenames)
         logger.debug(f"Found versions in {len(versions_found)} files")
         
         if not versions_found:
@@ -1842,12 +2104,14 @@ Configuration:
         except Exception as e:
             logger.warning(f"Unexpected error retrieving git status: {e}")
     
-    def _execute_increment_command(self, increment_type: str) -> int:
+    def _execute_increment_command(self, increment_type: str, filter_filenames: Optional[List[str]] = None, force: bool = False) -> int:
         """
         Execute version increment command with rollback mechanism and confirmation.
         
         Args:
             increment_type: Type of increment ('patch', 'minor', 'major')
+            filter_filenames: Optional list of specific filenames to update (if None, updates all)
+            force: If True, skip confirmation prompt
             
         Returns:
             Exit code (0 for success, 1 for failure)
@@ -1857,17 +2121,23 @@ Configuration:
         
         try:
             # Find current versions
-            versions_found = self.file_manager.find_versions_in_files()
+            versions_found = self.file_manager.find_versions_in_files(filter_filenames)
             
             if not versions_found:
-                print("Error: No versions found in configured files.")
-                print("\nConfigured file patterns:")
-                for config in self.file_manager.file_configs:
-                    print(f"  - {config.file_pattern}")
+                if filter_filenames:
+                    print("Error: No versions found in specified files.")
+                else:
+                    print("Error: No versions found in configured files.")
+                    print("\nConfigured file patterns:")
+                    for config in self.file_manager.file_configs:
+                        print(f"  - {config.file_pattern}")
                 return 1
             
             # Display current versions
-            print("Current versions found:")
+            if filter_filenames:
+                print("Current versions in specified files:")
+            else:
+                print("Current versions found:")
             for file_path, version in versions_found.items():
                 print(f"  {file_path}: {version}")
             print()
@@ -1889,15 +2159,18 @@ Configuration:
             print(f"New version will be: {new_version}")
             print()
             
-            # Get confirmation from user
-            try:
-                confirmation = input(f"Proceed with {increment_type} version increment to {new_version}? (y/N): ").strip().lower()
-                if confirmation not in ['y', 'yes']:
-                    print("Operation cancelled by user.")
+            # Get confirmation from user (unless force flag is set)
+            if not force:
+                try:
+                    confirmation = input(f"Proceed with {increment_type} version increment to {new_version}? (y/N): ").strip().lower()
+                    if confirmation not in ['y', 'yes']:
+                        print("Operation cancelled by user.")
+                        return 0
+                except (EOFError, KeyboardInterrupt):
+                    print("\nOperation cancelled by user.")
                     return 0
-            except (EOFError, KeyboardInterrupt):
-                print("\nOperation cancelled by user.")
-                return 0
+            else:
+                print(f"Force mode: Proceeding with {increment_type} version increment to {new_version}")
             
             print()
             print("Updating files...")
@@ -1905,6 +2178,10 @@ Configuration:
             # Store original file contents for rollback
             original_contents = {}
             files_to_update = self.file_manager.expand_file_patterns()
+            
+            # Filter files if specific filenames are provided
+            if filter_filenames:
+                files_to_update = [f for f in files_to_update if f in filter_filenames]
             
             # Read original contents before making changes
             for file_path in files_to_update:
@@ -2988,16 +3265,25 @@ def setup_logging(debug: bool = False) -> None:
     Args:
         debug: Enable debug level logging if True
     """
-    log_level = logging.DEBUG if debug else logging.INFO
+    if debug:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
+    
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    
+    # Configure handler based on debug mode
+    if debug:
+        handler = logging.StreamHandler(sys.stderr)
+    else:
+        handler = logging.handlers.SysLogHandler(address='/var/run/syslog')
+    
+    handler.setFormatter(logging.Formatter(log_format))
     
     # Configure root logger
     logging.basicConfig(
         level=log_level,
-        format=log_format,
-        handlers=[
-            logging.StreamHandler(sys.stderr)
-        ]
+        handlers=[handler]
     )
     
     # Create logger for grtp

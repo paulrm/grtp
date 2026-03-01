@@ -15,5 +15,6 @@
       "pattern": "version = \"v(\\d+\\.\\d+\\.\\d+)\"",
       "template": "version = \"v{version}\""
     }
-  ]
+  ],
+  "state": "Grey"
 }

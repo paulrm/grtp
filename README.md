@@ -5,6 +5,13 @@
 A command-line tool that helps with ATDD/TDD (Acceptance Test-Driven Development / Test-Driven Development) process automation and automates version management and release processes across multiple project files. The tool follows semantic versioning principles, integrates with git for release management, and ensures version consistency across all configured files in a project.
 
 
+# ATDD states
+  Grey) "Desing and Document"
+  Red) "Write test (that fails) and code"
+  Teal) "Document success and refactor"
+  Purple) "Prepare Release and deploy"
+
+
 ## Usage
 ```
 grtp view (default) --git 
